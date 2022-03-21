@@ -21,7 +21,7 @@
 
   <groupId>io.cdap.plugin</groupId>
   <artifactId>ftp-plugins</artifactId>
-  <version>3.0.0</version>
+  <version>3.0.0-SNAPSHOT</version>
 
   <licenses>
     <license>
@@ -36,9 +36,10 @@
     <!-- properties for script build step that creates the config files for the artifacts -->
     <data.pipeline.parent>system:cdap-data-pipeline[6.1.2-SNAPSHOT,7.0.0-SNAPSHOT)</data.pipeline.parent>
     <data.stream.parent>system:cdap-data-streams[6.1.2-SNAPSHOT,7.0.0-SNAPSHOT)</data.stream.parent>
-    <cdap.version>6.4.0-SNAPSHOT</cdap.version>
-    <hydrator.version>2.6.0-SNAPSHOT</hydrator.version>
+    <cdap.version>6.7.0-SNAPSHOT</cdap.version>
+    <hydrator.version>2.9.0-SNAPSHOT</hydrator.version>
     <hadoop.version>2.3.0</hadoop.version>
+    <commons.net.version>3.6</commons.net.version>
     <mockftp.version>2.6</mockftp.version>
     <junit.version>4.11</junit.version>
     <mockito.version>2.24.0</mockito.version>
@@ -110,6 +111,11 @@
       <artifactId>hadoop-mapreduce-client-core</artifactId>
       <version>${hadoop.version}</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-net</groupId>
+      <artifactId>commons-net</artifactId>
+      <version>${commons.net.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -248,7 +254,7 @@
     </dependency>
     <dependency>
       <groupId>io.cdap.cdap</groupId>
-      <artifactId>cdap-data-pipeline</artifactId>
+      <artifactId>cdap-data-pipeline2_2.11</artifactId>
       <version>${cdap.version}</version>
       <scope>test</scope>
     </dependency>
