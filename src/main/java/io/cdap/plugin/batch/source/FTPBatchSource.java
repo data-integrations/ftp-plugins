@@ -20,6 +20,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.annotation.Name;
@@ -32,7 +34,6 @@ import io.cdap.cdap.etl.api.batch.BatchSourceContext;
 import io.cdap.plugin.format.FileFormat;
 import io.cdap.plugin.format.plugin.AbstractFileSource;
 import io.cdap.plugin.format.plugin.FileSourceProperties;
-import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -142,7 +143,7 @@ public class FTPBatchSource extends AbstractFileSource {
         collector.addFailure("File system properties must be a valid json.", null)
           .withConfigProperty(NAME_FILE_SYSTEM_PROPERTIES).withStacktrace(e.getStackTrace());
       }
-      getFtpConnection(collector);
+      getConnection(collector);
     }
 
     @Override
@@ -328,12 +329,8 @@ public class FTPBatchSource extends AbstractFileSource {
      *
      * @param collector
      */
-    boolean getFtpConnection(FailureCollector collector) {
-      boolean connected = false;
+    boolean getConnection(FailureCollector collector) {
       Path urlInfo;
-      FTPClient ftpClient = new FTPClient();
-      // timeout after 5 seconds
-      ftpClient.setConnectTimeout(5000);
       String extractedPassword = extractPasswordFromUrl();
       String encodedPassword = URLEncoder.encode(extractedPassword);
       String validatePath = path.replace(extractedPassword, encodedPassword);
@@ -354,10 +351,23 @@ public class FTPBatchSource extends AbstractFileSource {
       if (port == -1 && protocol.equals(SFTP_PROTOCOL)) {
         port = DEFAULT_SFTP_PORT;
       }
+      if (protocol.equals(FTP_PROTOCOL)) {
+        return validateFTPConnection(collector, server, port, user, extractedPassword);
+      } else if (protocol.equals(SFTP_PROTOCOL)) {
+        return validateSFTPConnection(collector, server, port, user, extractedPassword);
+      }
+      return false;
+    }
+
+    private boolean validateFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
+      boolean connected = false;
+      FTPClient ftpClient = new FTPClient();
+      // timeout after 5 seconds
+      ftpClient.setConnectTimeout(5000);
       try {
         ftpClient.connect(server, port);
         try {
-          boolean isLogin = ftpClient.login(user, extractedPassword);
+          boolean isLogin = ftpClient.login(user, password);
           if (!isLogin) {
             collector.addFailure("Unable to authenticate with given username and password", null)
                     .withConfigProperty(PATH);
@@ -374,6 +384,11 @@ public class FTPBatchSource extends AbstractFileSource {
                 .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
       }
       return connected;
+    }
+
+    private boolean validateSFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
+      // TODO: add SFTP connection validation in future
+      return true;
     }
   }
 }

@@ -169,7 +169,7 @@ public class FTPBatchSourceTest {
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
     config.configuration("ftp://demo:password@invalid_server:21", "");
     config.validate(collector);
-    Assert.assertEquals(false, config.getFtpConnection(collector));
+    Assert.assertEquals(false, config.getConnection(collector));
   }
 
   @Test
@@ -178,7 +178,7 @@ public class FTPBatchSourceTest {
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
     config.configuration("ftp://wronguser:wrongpassword@test.rebex.net:21", "");
     config.validate(collector);
-    Assert.assertEquals(false, config.getFtpConnection(collector));
+    Assert.assertEquals(false, config.getConnection(collector));
   }
 
   @Test
@@ -187,6 +187,6 @@ public class FTPBatchSourceTest {
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
     config.configuration("ftp://demo:password@test.rebex.net:21", "");
     config.validate(collector);
-    Assert.assertEquals(true, config.getFtpConnection(collector));
+    Assert.assertEquals(true, config.getConnection(collector));
   }
 }

@@ -40,6 +40,7 @@
     <hydrator.version>2.9.0-SNAPSHOT</hydrator.version>
     <hadoop.version>2.3.0</hadoop.version>
     <commons.net.version>3.6</commons.net.version>
+    <jsch.version>0.1.51</jsch.version>
     <mockftp.version>2.6</mockftp.version>
     <junit.version>4.11</junit.version>
     <mockito.version>2.24.0</mockito.version>
@@ -116,6 +117,11 @@
       <groupId>commons-net</groupId>
       <artifactId>commons-net</artifactId>
       <version>${commons.net.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.jcraft</groupId>
+      <artifactId>jsch</artifactId>
+      <version>${jsch.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
