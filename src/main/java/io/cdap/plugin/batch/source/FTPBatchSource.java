@@ -20,8 +20,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
-import com.jcraft.jsch.JSch;
-import com.jcraft.jsch.Session;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.annotation.Name;
@@ -34,17 +32,19 @@ import io.cdap.cdap.etl.api.batch.BatchSourceContext;
 import io.cdap.plugin.format.FileFormat;
 import io.cdap.plugin.format.plugin.AbstractFileSource;
 import io.cdap.plugin.format.plugin.FileSourceProperties;
+import net.schmizz.sshj.SSHClient;
+import net.schmizz.sshj.transport.verification.PromiscuousVerifier;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 
 /**
  * {@link BatchSource} that reads from an FTP or SFTP server.
@@ -143,7 +143,7 @@ public class FTPBatchSource extends AbstractFileSource {
         collector.addFailure("File system properties must be a valid json.", null)
           .withConfigProperty(NAME_FILE_SYSTEM_PROPERTIES).withStacktrace(e.getStackTrace());
       }
-      getConnection(collector);
+      validateConnection(collector);
     }
 
     @Override
@@ -329,7 +329,7 @@ public class FTPBatchSource extends AbstractFileSource {
      *
      * @param collector
      */
-    boolean getConnection(FailureCollector collector) {
+    void validateConnection(FailureCollector collector) {
       Path urlInfo;
       String extractedPassword = extractPasswordFromUrl();
       String encodedPassword = URLEncoder.encode(extractedPassword);
@@ -352,15 +352,13 @@ public class FTPBatchSource extends AbstractFileSource {
         port = DEFAULT_SFTP_PORT;
       }
       if (protocol.equals(FTP_PROTOCOL)) {
-        return validateFTPConnection(collector, server, port, user, extractedPassword);
+        validateFTPConnection(collector, server, port, user, extractedPassword);
       } else if (protocol.equals(SFTP_PROTOCOL)) {
-        return validateSFTPConnection(collector, server, port, user, extractedPassword);
+        validateSFTPConnection(collector, server, port, user, extractedPassword);
       }
-      return false;
     }
 
-    private boolean validateFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
-      boolean connected = false;
+    private void validateFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
       FTPClient ftpClient = new FTPClient();
       // timeout after 5 seconds
       ftpClient.setConnectTimeout(5000);
@@ -371,8 +369,6 @@ public class FTPBatchSource extends AbstractFileSource {
           if (!isLogin) {
             collector.addFailure("Unable to authenticate with given username and password", null)
                     .withConfigProperty(PATH);
-          } else {
-            connected = true;
           }
           ftpClient.disconnect();
         } catch (Exception e) {
@@ -383,12 +379,21 @@ public class FTPBatchSource extends AbstractFileSource {
         collector.addFailure("Unable to establish connection with given host and port", null)
                 .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
       }
-      return connected;
     }
 
-    private boolean validateSFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
-      // TODO: add SFTP connection validation in future
-      return true;
+    private void validateSFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
+      SSHClient client = new SSHClient();
+      client.setConnectTimeout(5000);
+      client.setTimeout(5000);
+      client.addHostKeyVerifier(new PromiscuousVerifier());
+      try {
+        client.connect(server, port);
+        client.authPassword(user, password);
+        client.disconnect();
+      } catch (Exception e) {
+        collector.addFailure("Unable to establish connection with given host and port", null)
+                .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
+      }
     }
   }
 }

@@ -169,7 +169,7 @@ public class FTPBatchSourceTest {
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
     config.configuration("ftp://demo:password@invalid_server:21", "");
     config.validate(collector);
-    Assert.assertEquals(false, config.getConnection(collector));
+    Assert.assertEquals(1, collector.getValidationFailures().size());
   }
 
   @Test
@@ -178,7 +178,7 @@ public class FTPBatchSourceTest {
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
     config.configuration("ftp://wronguser:wrongpassword@test.rebex.net:21", "");
     config.validate(collector);
-    Assert.assertEquals(false, config.getConnection(collector));
+    Assert.assertEquals(1, collector.getValidationFailures().size());
   }
 
   @Test
@@ -187,6 +187,35 @@ public class FTPBatchSourceTest {
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
     config.configuration("ftp://demo:password@test.rebex.net:21", "");
     config.validate(collector);
-    Assert.assertEquals(true, config.getConnection(collector));
+    Assert.assertEquals(0, collector.getValidationFailures().size());
+  }
+
+  @Test
+  public void testInvalidServerSFTPPathConnection() {
+    FailureCollector collector = new MockFailureCollector();
+    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
+    config.configuration("sftp://demo:password@invalid_server:22", "");
+    config.validate(collector);
+    Assert.assertEquals(1, collector.getValidationFailures().size());
+  }
+
+  @Test
+  public void testInvalidUsernamePasswordSFTPPathConnection() {
+    FailureCollector collector = new MockFailureCollector();
+    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
+    config.configuration("sftp://wronguser:wrongpassword@test.rebex.net:22", "");
+    config.validate(collector);
+    Assert.assertEquals(1, collector.getValidationFailures().size());
+  }
+
+  @Test
+  public void testValidSFTPPathConnection() {
+    FailureCollector collector = new MockFailureCollector();
+    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
+    config.configuration("sftp://demo:password@test.rebex.net:22", "");
+    config.validate(collector);
+    Assert.assertEquals(0, collector.getValidationFailures().size());
   }
 }
+
+
