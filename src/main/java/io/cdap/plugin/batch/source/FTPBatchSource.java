@@ -38,13 +38,13 @@ import org.apache.commons.net.ftp.FTPClient;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
-import javax.annotation.Nullable;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 
 /**
  * {@link BatchSource} that reads from an FTP or SFTP server.
@@ -341,7 +341,7 @@ public class FTPBatchSource extends AbstractFileSource {
       }
       // server is the substring between @ and : in the path
       String server = urlInfo.toUri().getAuthority().substring(urlInfo.toUri().getAuthority().lastIndexOf("@") + 1,
-              urlInfo.toUri().getAuthority().lastIndexOf(":"));
+                                                               urlInfo.toUri().getAuthority().lastIndexOf(":"));
       String user = urlInfo.toUri().getAuthority().split(":")[0];
       String protocol = urlInfo.toUri().getScheme();
       int port = urlInfo.toUri().getPort();
@@ -368,16 +368,16 @@ public class FTPBatchSource extends AbstractFileSource {
           boolean isLogin = ftpClient.login(user, password);
           if (!isLogin) {
             collector.addFailure("Unable to authenticate with given username and password", null)
-                    .withConfigProperty(PATH);
+              .withConfigProperty(PATH);
           }
           ftpClient.disconnect();
         } catch (Exception e) {
           collector.addFailure("Unable to authenticate with given username and password", null)
-                  .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
+            .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
         }
       } catch (Exception e) {
         collector.addFailure("Unable to establish connection with given host and port", null)
-                .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
+          .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
       }
     }
 
@@ -392,7 +392,7 @@ public class FTPBatchSource extends AbstractFileSource {
         client.disconnect();
       } catch (Exception e) {
         collector.addFailure("Unable to establish connection with given host and port", null)
-                .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
+          .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
       }
     }
   }
