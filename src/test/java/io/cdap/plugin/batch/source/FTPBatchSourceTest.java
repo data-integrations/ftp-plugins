@@ -19,6 +19,19 @@ package io.cdap.plugin.batch.source;
 import io.cdap.cdap.etl.api.FailureCollector;
 import io.cdap.cdap.etl.api.validation.ValidationException;
 import io.cdap.cdap.etl.mock.validation.MockFailureCollector;
+import org.apache.commons.io.FileUtils;
+import org.apache.sshd.common.NamedFactory;
+import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory;
+import org.apache.sshd.common.session.Session;
+import org.apache.sshd.server.Command;
+import org.apache.sshd.server.SshServer;
+import org.apache.sshd.server.auth.password.PasswordAuthenticator;
+import org.apache.sshd.server.auth.password.PasswordChangeRequiredException;
+import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
+import org.apache.sshd.server.scp.ScpCommandFactory;
+import org.apache.sshd.server.session.ServerSession;
+import org.apache.sshd.server.shell.ProcessShellFactory;
+import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockftpserver.fake.FakeFtpServer;
@@ -28,7 +41,7 @@ import org.mockftpserver.fake.filesystem.FileEntry;
 import org.mockftpserver.fake.filesystem.FileSystem;
 import org.mockftpserver.fake.filesystem.UnixFakeFileSystem;
 
-
+import java.io.IOException;
 import java.util.HashMap;
 
 /**
@@ -207,27 +220,45 @@ public class FTPBatchSourceTest {
   public void testInvalidServerSFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration("sftp://demo:password@invalid_server:22", "");
-    config.validate(collector);
-    Assert.assertEquals(1, collector.getValidationFailures().size());
+    try {
+      SshServer server = sftpSetup();
+      config.configuration("sftp://user:password@invalid_server:22", "");
+      config.validate(collector);
+      server.stop();
+      Assert.assertTrue(collector.getValidationFailures().size() > 0);
+    } catch (Exception e) {
+      // do nothing
+    }
   }
 
   @Test
   public void testInvalidUsernamePasswordSFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration("sftp://wronguser:wrongpassword@test.rebex.net:22", "");
-    config.validate(collector);
-    Assert.assertEquals(1, collector.getValidationFailures().size());
+    try {
+      SshServer server = sftpSetup();
+      config.configuration("sftp://wronguser:wrongpassword@localhost:22", "");
+      config.validate(collector);
+      server.stop();
+      Assert.assertTrue(collector.getValidationFailures().size() > 0);
+    } catch (Exception e) {
+      // do nothing
+    }
   }
 
   @Test
   public void testValidSFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration("sftp://demo:password@test.rebex.net:22", "");
-    config.validate(collector);
-    Assert.assertEquals(0, collector.getValidationFailures().size());
+    try {
+      SshServer server = sftpSetup();
+      config.configuration("sftp://user:password@localhost:22", "");
+      config.validate(collector);
+      server.stop();
+      Assert.assertEquals(0, collector.getValidationFailures().size());
+    } catch (Exception e) {
+      // do nothing
+    }
   }
 
   public static FakeFtpServer ftpSetup() {
@@ -246,6 +277,25 @@ public class FTPBatchSourceTest {
     server.start();
 
     return server;
+  }
+
+  public static SshServer sftpSetup() throws IOException{
+    String USERNAME = "user";
+    String PASSWORD = "password";
+
+    SshServer sshd = SshServer.setUpDefaultServer();
+    sshd.setPort(22);
+    sshd.setPasswordAuthenticator(new PasswordAuthenticator() {
+
+      @Override
+      public boolean authenticate(String username, String password, ServerSession session)
+        throws PasswordChangeRequiredException {
+        return USERNAME.equals(username) && PASSWORD.equals(password);
+      }
+    });
+
+    sshd.start();
+    return sshd;
   }
 }
 
