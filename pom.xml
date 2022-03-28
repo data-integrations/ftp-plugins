@@ -41,6 +41,7 @@
     <hadoop.version>2.3.0</hadoop.version>
     <commons.net.version>3.6</commons.net.version>
     <sshj.version>0.27.0</sshj.version>
+    <sshd.version>2.5.1</sshd.version>
     <mockftp.version>2.6</mockftp.version>
     <junit.version>4.11</junit.version>
     <mockito.version>2.24.0</mockito.version>

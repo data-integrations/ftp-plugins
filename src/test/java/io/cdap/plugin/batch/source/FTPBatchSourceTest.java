@@ -21,6 +21,13 @@ import io.cdap.cdap.etl.api.validation.ValidationException;
 import io.cdap.cdap.etl.mock.validation.MockFailureCollector;
 import org.junit.Assert;
 import org.junit.Test;
+import org.mockftpserver.fake.FakeFtpServer;
+import org.mockftpserver.fake.UserAccount;
+import org.mockftpserver.fake.filesystem.DirectoryEntry;
+import org.mockftpserver.fake.filesystem.FileEntry;
+import org.mockftpserver.fake.filesystem.FileSystem;
+import org.mockftpserver.fake.filesystem.UnixFakeFileSystem;
+
 
 import java.util.HashMap;
 
@@ -167,26 +174,32 @@ public class FTPBatchSourceTest {
   public void testInvalidServerFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration("ftp://demo:password@invalid_server:21", "");
+    FakeFtpServer server = ftpSetup();
+    config.configuration("ftp://user:password@invalid_server:21", "");
     config.validate(collector);
-    Assert.assertEquals(1, collector.getValidationFailures().size());
+    server.stop();
+    Assert.assertTrue(collector.getValidationFailures().size() > 0);
   }
 
   @Test
   public void testInvalidUsernamePasswordFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration("ftp://wronguser:wrongpassword@test.rebex.net:21", "");
+    FakeFtpServer server = ftpSetup();
+    config.configuration("ftp://wronguser:wrongpassword@localhost:21", "");
     config.validate(collector);
-    Assert.assertEquals(1, collector.getValidationFailures().size());
+    server.stop();
+    Assert.assertTrue(collector.getValidationFailures().size() > 0);
   }
 
   @Test
   public void testValidFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration("ftp://demo:password@test.rebex.net:21", "");
+    FakeFtpServer server = ftpSetup();
+    config.configuration("ftp://user:password@localhost:21", "");
     config.validate(collector);
+    server.stop();
     Assert.assertEquals(0, collector.getValidationFailures().size());
   }
 
@@ -215,6 +228,24 @@ public class FTPBatchSourceTest {
     config.configuration("sftp://demo:password@test.rebex.net:22", "");
     config.validate(collector);
     Assert.assertEquals(0, collector.getValidationFailures().size());
+  }
+
+  public static FakeFtpServer ftpSetup() {
+
+    FakeFtpServer server = new FakeFtpServer();
+    server.addUserAccount(new UserAccount("user", "password", "/tmp"));
+    server.setServerControlPort(21);
+
+    FileSystem fileSystem = new UnixFakeFileSystem();
+    fileSystem.add(new DirectoryEntry("/tmp"));
+    fileSystem.add(new FileEntry("/tmp/file1.txt", "hello world"));
+    fileSystem.add(new FileEntry("/tmp/file2.txt", "hello world"));
+    fileSystem.add(new FileEntry("/tmp/file3.txt", "hello world"));
+
+    server.setFileSystem(fileSystem);
+    server.start();
+
+    return server;
   }
 }
 
