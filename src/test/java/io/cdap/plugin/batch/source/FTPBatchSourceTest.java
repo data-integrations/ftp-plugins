@@ -19,20 +19,9 @@ package io.cdap.plugin.batch.source;
 import io.cdap.cdap.etl.api.FailureCollector;
 import io.cdap.cdap.etl.api.validation.ValidationException;
 import io.cdap.cdap.etl.mock.validation.MockFailureCollector;
-import org.apache.commons.io.FileUtils;
-import org.apache.sshd.common.NamedFactory;
-import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory;
-import org.apache.sshd.common.session.Session;
-import org.apache.sshd.server.Command;
-import org.apache.sshd.server.SshServer;
-import org.apache.sshd.server.auth.password.PasswordAuthenticator;
-import org.apache.sshd.server.auth.password.PasswordChangeRequiredException;
-import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
-import org.apache.sshd.server.scp.ScpCommandFactory;
-import org.apache.sshd.server.session.ServerSession;
-import org.apache.sshd.server.shell.ProcessShellFactory;
-import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockftpserver.fake.FakeFtpServer;
 import org.mockftpserver.fake.UserAccount;
@@ -41,7 +30,6 @@ import org.mockftpserver.fake.filesystem.FileEntry;
 import org.mockftpserver.fake.filesystem.FileSystem;
 import org.mockftpserver.fake.filesystem.UnixFakeFileSystem;
 
-import java.io.IOException;
 import java.util.HashMap;
 
 /**
@@ -61,6 +49,28 @@ public class FTPBatchSourceTest {
   private static final String SFTP_PREFIX = "sftp";
   private static final String SFTP_FS_CLASS = "org.apache.hadoop.fs.sftp.SFTPFileSystem";
   private static final String FS_SFTP_IMPL = "fs.sftp.impl";
+  private static FakeFtpServer ftpServer;
+
+  @BeforeClass
+  public static void ftpSetup() {
+    ftpServer = new FakeFtpServer();
+    ftpServer.addUserAccount(new UserAccount("user", "password", "/tmp"));
+    ftpServer.setServerControlPort(21);
+
+    FileSystem fileSystem = new UnixFakeFileSystem();
+    fileSystem.add(new DirectoryEntry("/tmp"));
+    fileSystem.add(new FileEntry("/tmp/file1.txt", "hello world"));
+    fileSystem.add(new FileEntry("/tmp/file2.txt", "hello world"));
+    fileSystem.add(new FileEntry("/tmp/file3.txt", "hello world"));
+
+    ftpServer.setFileSystem(fileSystem);
+    ftpServer.start();
+  }
+
+  @AfterClass
+  public static void ftpTeardown() {
+    ftpServer.stop();
+  }
 
   @Test
   public void testFTPPathWithSpecialCharactersInAuth() {
@@ -187,10 +197,8 @@ public class FTPBatchSourceTest {
   public void testInvalidServerFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    FakeFtpServer server = ftpSetup();
     config.configuration("ftp://user:password@invalid_server:21", "");
     config.validate(collector);
-    server.stop();
     Assert.assertTrue(collector.getValidationFailures().size() > 0);
   }
 
@@ -198,10 +206,8 @@ public class FTPBatchSourceTest {
   public void testInvalidUsernamePasswordFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    FakeFtpServer server = ftpSetup();
     config.configuration("ftp://wronguser:wrongpassword@localhost:21", "");
     config.validate(collector);
-    server.stop();
     Assert.assertTrue(collector.getValidationFailures().size() > 0);
   }
 
@@ -209,93 +215,9 @@ public class FTPBatchSourceTest {
   public void testValidFTPPathConnection() {
     FailureCollector collector = new MockFailureCollector();
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    FakeFtpServer server = ftpSetup();
     config.configuration("ftp://user:password@localhost:21", "");
     config.validate(collector);
-    server.stop();
     Assert.assertEquals(0, collector.getValidationFailures().size());
-  }
-
-  @Test
-  public void testInvalidServerSFTPPathConnection() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    try {
-      SshServer server = sftpSetup();
-      config.configuration("sftp://user:password@invalid_server:22", "");
-      config.validate(collector);
-      server.stop();
-      Assert.assertTrue(collector.getValidationFailures().size() > 0);
-    } catch (Exception e) {
-      // do nothing
-    }
-  }
-
-  @Test
-  public void testInvalidUsernamePasswordSFTPPathConnection() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    try {
-      SshServer server = sftpSetup();
-      config.configuration("sftp://wronguser:wrongpassword@localhost:22", "");
-      config.validate(collector);
-      server.stop();
-      Assert.assertTrue(collector.getValidationFailures().size() > 0);
-    } catch (Exception e) {
-      // do nothing
-    }
-  }
-
-  @Test
-  public void testValidSFTPPathConnection() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    try {
-      SshServer server = sftpSetup();
-      config.configuration("sftp://user:password@localhost:22", "");
-      config.validate(collector);
-      server.stop();
-      Assert.assertEquals(0, collector.getValidationFailures().size());
-    } catch (Exception e) {
-      // do nothing
-    }
-  }
-
-  public static FakeFtpServer ftpSetup() {
-
-    FakeFtpServer server = new FakeFtpServer();
-    server.addUserAccount(new UserAccount("user", "password", "/tmp"));
-    server.setServerControlPort(21);
-
-    FileSystem fileSystem = new UnixFakeFileSystem();
-    fileSystem.add(new DirectoryEntry("/tmp"));
-    fileSystem.add(new FileEntry("/tmp/file1.txt", "hello world"));
-    fileSystem.add(new FileEntry("/tmp/file2.txt", "hello world"));
-    fileSystem.add(new FileEntry("/tmp/file3.txt", "hello world"));
-
-    server.setFileSystem(fileSystem);
-    server.start();
-
-    return server;
-  }
-
-  public static SshServer sftpSetup() throws IOException{
-    String USERNAME = "user";
-    String PASSWORD = "password";
-
-    SshServer sshd = SshServer.setUpDefaultServer();
-    sshd.setPort(22);
-    sshd.setPasswordAuthenticator(new PasswordAuthenticator() {
-
-      @Override
-      public boolean authenticate(String username, String password, ServerSession session)
-        throws PasswordChangeRequiredException {
-        return USERNAME.equals(username) && PASSWORD.equals(password);
-      }
-    });
-
-    sshd.start();
-    return sshd;
   }
 }
 

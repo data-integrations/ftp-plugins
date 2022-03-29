@@ -32,9 +32,8 @@ import io.cdap.cdap.etl.api.batch.BatchSourceContext;
 import io.cdap.plugin.format.FileFormat;
 import io.cdap.plugin.format.plugin.AbstractFileSource;
 import io.cdap.plugin.format.plugin.FileSourceProperties;
-import net.schmizz.sshj.SSHClient;
-import net.schmizz.sshj.transport.verification.PromiscuousVerifier;
-import org.apache.commons.net.ftp.FTPClient;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
@@ -138,12 +137,35 @@ public class FTPBatchSource extends AbstractFileSource {
         if (!containsMacro(PATH)) {
           validateAuthenticationInPath(collector);
         }
-        getFileSystemProperties(collector);
+        Map<String, String> fsp = getFileSystemProperties(collector);
+        try {
+          Path urlInfo;
+          String extractedPassword = extractPasswordFromUrl();
+          String encodedPassword = URLEncoder.encode(extractedPassword);
+          String validatePath = path.replace(extractedPassword, encodedPassword);
+          try {
+            urlInfo = new Path(validatePath);
+          } catch (Exception e) {
+            throw new IllegalArgumentException(String.format("Unable to parse url: %s %s", e.getMessage(), e));
+          }
+          Configuration conf = new Configuration();
+          for (Map.Entry<String,String> entry : fsp.entrySet()) {
+            conf.set(entry.getKey(), entry.getValue());
+          }
+          String protocol = urlInfo.toUri().getScheme();
+          if (protocol.equals(SFTP_PROTOCOL)) {
+            conf.set(FS_SFTP_IMPL, SFTP_FS_CLASS);
+          }
+          FileSystem fs = FileSystem.newInstance(urlInfo.toUri(), conf);
+          fs.getFileStatus(urlInfo);
+        } catch (Exception e) {
+          collector.addFailure("Unable to connect with given url", null)
+            .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
+        }
       } catch (IllegalArgumentException e) {
         collector.addFailure("File system properties must be a valid json.", null)
           .withConfigProperty(NAME_FILE_SYSTEM_PROPERTIES).withStacktrace(e.getStackTrace());
       }
-      validateConnection(collector);
     }
 
     @Override
@@ -319,80 +341,6 @@ public class FTPBatchSource extends AbstractFileSource {
                                "prefix://username:password@hostname:port/path")
           .withConfigProperty(PATH);
         collector.getOrThrowException();
-      }
-    }
-
-    /**
-     * This method checks if user enters a valid ftp path by first checking the server
-     * and port number, then the username and password. Will timeout after 10 seconds
-     * if connection is not established.
-     *
-     * @param collector
-     */
-    void validateConnection(FailureCollector collector) {
-      Path urlInfo;
-      String extractedPassword = extractPasswordFromUrl();
-      String encodedPassword = URLEncoder.encode(extractedPassword);
-      String validatePath = path.replace(extractedPassword, encodedPassword);
-      try {
-        urlInfo = new Path(validatePath);
-      } catch (Exception e) {
-        throw new IllegalArgumentException(String.format("Unable to parse url: %s %s", e.getMessage(), e));
-      }
-      // server is the substring between @ and : in the path
-      String server = urlInfo.toUri().getAuthority().substring(urlInfo.toUri().getAuthority().lastIndexOf("@") + 1,
-                                                               urlInfo.toUri().getAuthority().lastIndexOf(":"));
-      String user = urlInfo.toUri().getAuthority().split(":")[0];
-      String protocol = urlInfo.toUri().getScheme();
-      int port = urlInfo.toUri().getPort();
-      if (port == -1 && protocol.equals(FTP_PROTOCOL)) {
-        port = DEFAULT_FTP_PORT;
-      }
-      if (port == -1 && protocol.equals(SFTP_PROTOCOL)) {
-        port = DEFAULT_SFTP_PORT;
-      }
-      if (protocol.equals(FTP_PROTOCOL)) {
-        validateFTPConnection(collector, server, port, user, extractedPassword);
-      } else if (protocol.equals(SFTP_PROTOCOL)) {
-        validateSFTPConnection(collector, server, port, user, extractedPassword);
-      }
-    }
-
-    private void validateFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
-      FTPClient ftpClient = new FTPClient();
-      // timeout after 5 seconds
-      ftpClient.setConnectTimeout(5000);
-      try {
-        ftpClient.connect(server, port);
-        try {
-          boolean isLogin = ftpClient.login(user, password);
-          if (!isLogin) {
-            collector.addFailure("Unable to authenticate with given username and password", null)
-              .withConfigProperty(PATH);
-          }
-          ftpClient.disconnect();
-        } catch (Exception e) {
-          collector.addFailure("Unable to authenticate with given username and password", null)
-            .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
-        }
-      } catch (Exception e) {
-        collector.addFailure("Unable to establish connection with given host and port", null)
-          .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
-      }
-    }
-
-    private void validateSFTPConnection(FailureCollector collector, String server, int port, String user, String password) {
-      SSHClient client = new SSHClient();
-      client.setConnectTimeout(5000);
-      client.setTimeout(5000);
-      client.addHostKeyVerifier(new PromiscuousVerifier());
-      try {
-        client.connect(server, port);
-        client.authPassword(user, password);
-        client.disconnect();
-      } catch (Exception e) {
-        collector.addFailure("Unable to establish connection with given host and port", null)
-          .withConfigProperty(PATH).withStacktrace(e.getStackTrace());
       }
     }
   }

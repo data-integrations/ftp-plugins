@@ -39,9 +39,6 @@
     <cdap.version>6.4.0</cdap.version>
     <hydrator.version>2.6.0</hydrator.version>
     <hadoop.version>2.3.0</hadoop.version>
-    <commons.net.version>3.6</commons.net.version>
-    <sshj.version>0.27.0</sshj.version>
-    <sshd.version>1.2.0</sshd.version>
     <mockftp.version>2.6</mockftp.version>
     <junit.version>4.11</junit.version>
     <mockito.version>2.24.0</mockito.version>
@@ -113,16 +110,6 @@
       <artifactId>hadoop-mapreduce-client-core</artifactId>
       <version>${hadoop.version}</version>
       <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>commons-net</groupId>
-      <artifactId>commons-net</artifactId>
-      <version>${commons.net.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.hierynomus</groupId>
-      <artifactId>sshj</artifactId>
-      <version>${sshj.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -223,11 +210,6 @@
           <artifactId>jersey-core</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.sshd</groupId>
-      <artifactId>sshd-core</artifactId>
-      <version>${sshd.version}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
