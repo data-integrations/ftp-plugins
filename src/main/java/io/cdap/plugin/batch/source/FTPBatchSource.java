@@ -157,6 +157,7 @@ public class FTPBatchSource extends AbstractFileSource {
             conf.set(FS_SFTP_IMPL, SFTP_FS_CLASS);
           }
           FileSystem fs = FileSystem.newInstance(urlInfo.toUri(), conf);
+          // TODO: Add setTimeout option in the future
           fs.getFileStatus(urlInfo);
         } catch (Exception e) {
           collector.addFailure("Unable to connect with given url", null)

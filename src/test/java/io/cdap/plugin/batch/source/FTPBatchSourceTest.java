@@ -41,7 +41,7 @@ public class FTPBatchSourceTest {
   private static final String USER = "user";
   private static final String PASSWORD_WITH_SPECIAL_CHARACTERS = "wex^Yz@123#456!";
   private static final String PASSWORD_WITHOUT_SPECIAL_CHARACTERS = "wexYz123456";
-  private static final String HOST = "192.168.0.179";
+  private static final String HOST = "localhost";
   private static final int FTP_DEFAULT_PORT = 21;
   private static final int SFTP_DEFAULT_PORT = 22;
   private static final String PATH = "/user-look-here.txt";
