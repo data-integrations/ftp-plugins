@@ -149,7 +149,7 @@ public class FTPBatchSource extends AbstractFileSource {
             throw new IllegalArgumentException(String.format("Unable to parse url: %s %s", e.getMessage(), e));
           }
           Configuration conf = new Configuration();
-          for (Map.Entry<String,String> entry : fsp.entrySet()) {
+          for (Map.Entry<String, String> entry : fsp.entrySet()) {
             conf.set(entry.getKey(), entry.getValue());
           }
           String protocol = urlInfo.toUri().getScheme();
