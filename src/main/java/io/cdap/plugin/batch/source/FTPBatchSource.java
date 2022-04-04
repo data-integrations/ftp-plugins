@@ -158,6 +158,7 @@ public class FTPBatchSource extends AbstractFileSource {
           }
           FileSystem fs = FileSystem.newInstance(urlInfo.toUri(), conf);
           // TODO: Add setTimeout option in the future
+          // https://cdap.atlassian.net/browse/PLUGIN-1181
           fs.getFileStatus(urlInfo);
         } catch (Exception e) {
           collector.addFailure("Unable to connect with given url", null)
