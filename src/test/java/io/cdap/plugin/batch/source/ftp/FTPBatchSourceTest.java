@@ -16,9 +16,14 @@
 package io.cdap.plugin.batch.source.ftp;
 
 
+import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.etl.api.FailureCollector;
+import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.validation.ValidationException;
+import io.cdap.cdap.etl.mock.common.MockPipelineConfigurer;
 import io.cdap.cdap.etl.mock.validation.MockFailureCollector;
+import io.cdap.plugin.format.delimited.input.CSVInputFormatProvider;
+import io.cdap.plugin.format.delimited.input.DelimitedConfig;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -30,7 +35,9 @@ import org.mockftpserver.fake.filesystem.FileEntry;
 import org.mockftpserver.fake.filesystem.FileSystem;
 import org.mockftpserver.fake.filesystem.UnixFakeFileSystem;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Unit test for {@link FTPBatchSource.FTPBatchSourceConfig} class.
@@ -60,7 +67,7 @@ public class FTPBatchSourceTest {
 
     FileSystem fileSystem = new UnixFakeFileSystem();
     fileSystem.add(new DirectoryEntry("/tmp"));
-    fileSystem.add(new FileEntry("/tmp/file1.txt", "hello world"));
+    fileSystem.add(new FileEntry("/tmp/file1.txt", "hello,world"));
     fileSystem.add(new FileEntry("/tmp/file2.txt", "hello world"));
     fileSystem.add(new FileEntry("/tmp/file3.txt", "hello world"));
 
@@ -72,6 +79,22 @@ public class FTPBatchSourceTest {
   @AfterClass
   public static void ftpTeardown() {
     ftpServer.stop();
+  }
+
+  @Test
+  public void testSchemaDetection() {
+    String path = String.format("ftp://user:password@%s:%d/tmp/file1.txt", HOST, ftpServerPort);
+    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig(path, "csv", false);
+    FTPBatchSource ftpBatchSource = new FTPBatchSource(config);
+    Map<String, Object> plugins = new HashMap<>();
+    plugins.put("csv", new CSVInputFormatProvider(new DelimitedConfig()));
+    MockPipelineConfigurer pipelineConfigurer = new MockPipelineConfigurer(null, plugins);
+    ftpBatchSource.configurePipeline(pipelineConfigurer);
+    Schema outputSchema = pipelineConfigurer.getOutputSchema();
+    Schema expectedSchema = Schema.recordOf("text",
+                                            Schema.Field.of("body_0", Schema.of(Schema.Type.STRING)),
+                                            Schema.Field.of("body_1", Schema.of(Schema.Type.STRING)));
+    Assert.assertEquals(expectedSchema, outputSchema);
   }
 
   @Test
