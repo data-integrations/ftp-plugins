@@ -170,6 +170,18 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
             + "read the data.")
     private String schema;
 
+    @Macro
+    @Nullable
+    @Description("The delimiter to use if the format is 'delimited'. The delimiter will be ignored if the format "
+      + "is anything other than 'delimited'.")
+    private String delimiter;
+
+    @Macro
+    @Nullable
+    @Description("Whether to treat content between quotes as a value. This value will only be used if the format " +
+      "is 'csv', 'tsv' or 'delimited'. The default value is false.")
+    protected Boolean enableQuotedValues;
+
 
     @VisibleForTesting
     FTPBatchSourceConfig() {
