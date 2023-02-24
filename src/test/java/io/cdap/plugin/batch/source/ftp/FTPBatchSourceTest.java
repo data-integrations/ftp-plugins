@@ -18,7 +18,6 @@ package io.cdap.plugin.batch.source.ftp;
 
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.etl.api.FailureCollector;
-import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.validation.ValidationException;
 import io.cdap.cdap.etl.mock.common.MockPipelineConfigurer;
 import io.cdap.cdap.etl.mock.validation.MockFailureCollector;
@@ -35,7 +34,6 @@ import org.mockftpserver.fake.filesystem.FileEntry;
 import org.mockftpserver.fake.filesystem.FileSystem;
 import org.mockftpserver.fake.filesystem.UnixFakeFileSystem;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -63,6 +61,7 @@ public class FTPBatchSourceTest {
   public static void ftpSetup() {
     ftpServer = new FakeFtpServer();
     ftpServer.addUserAccount(new UserAccount("user", "password", "/tmp"));
+    ftpServer.addUserAccount(new UserAccount("user2", PASSWORD_WITH_SPECIAL_CHARACTERS, "/tmp"));
     ftpServer.setServerControlPort(0);
 
     FileSystem fileSystem = new UnixFakeFileSystem();
@@ -83,7 +82,8 @@ public class FTPBatchSourceTest {
 
   @Test
   public void testSchemaDetection() {
-    String path = String.format("ftp://user:password@%s:%d/tmp/file1.txt", HOST, ftpServerPort);
+    String path = String.format("ftp://user2:%s@%s:%d/tmp/file1.txt",
+                                PASSWORD_WITH_SPECIAL_CHARACTERS, HOST, ftpServerPort);
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig(path, "csv", false);
     FTPBatchSource ftpBatchSource = new FTPBatchSource(config);
     Map<String, Object> plugins = new HashMap<>();
@@ -153,6 +153,7 @@ public class FTPBatchSourceTest {
     fileSystemProperties.put(String.format("fs.sftp.password.%s.%s", HOST, USER), PASSWORD_WITH_SPECIAL_CHARACTERS);
     fileSystemProperties.put("fs.sftp.host.port", String.valueOf(SFTP_DEFAULT_PORT));
     Assert.assertEquals(fileSystemProperties, config.getFileSystemProperties(collector));
+    Assert.assertEquals(String.format("%s://%s:%d%s", SFTP_PREFIX, HOST, SFTP_DEFAULT_PORT, PATH), config.getPath());
   }
 
   @Test
