@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.UriBuilder;
 
 /**
  * {@link BatchSource} that reads from an FTP or SFTP server.
@@ -93,11 +94,9 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
   }
 
   @Override
-  protected Map<String, String> getFileSystemProperties(BatchSourceContext context) {
-    Map<String, String> properties = new HashMap<>();
-    if (context != null) {
-      properties.putAll(config.getFileSystemProperties(context.getFailureCollector()));
-    }
+  protected Map<String, String> getFileSystemProperties(@Nullable BatchSourceContext context) {
+    FailureCollector failureCollector = context == null ? null : context.getFailureCollector();
+    Map<String, String> properties = new HashMap<>(config.getFileSystemProperties(failureCollector));
 
     if (!properties.containsKey(FS_SFTP_IMPL)) {
       properties.put(FS_SFTP_IMPL, SFTP_FS_CLASS);
@@ -206,11 +205,8 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
         Map<String, String> fsp = getFileSystemProperties(collector);
         try {
           Path urlInfo;
-          String extractedPassword = extractPasswordFromUrl();
-          String encodedPassword = URLEncoder.encode(extractedPassword);
-          String validatePath = path.replace(extractedPassword, encodedPassword);
           try {
-            urlInfo = new Path(validatePath);
+            urlInfo = new Path(getPath());
           } catch (Exception e) {
             throw new IllegalArgumentException(String.format("Unable to parse url: %s %s", e.getMessage(), e));
           }
@@ -258,8 +254,6 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
         } catch (Exception e) {
           throw new IllegalArgumentException(String.format("Unable to parse url: %s %s", e.getMessage(), e));
         }
-        String host = urlInfo.toUri().getAuthority().substring(urlInfo.toUri().getAuthority().lastIndexOf("@") + 1);
-        String user = urlInfo.toUri().getAuthority().split(":")[0];
         String protocol = urlInfo.toUri().getScheme();
         int port = urlInfo.toUri().getPort();
         if (port == -1 && protocol.equals(FTP_PROTOCOL)) {
@@ -268,8 +262,7 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
         if (port == -1 && protocol.equals(SFTP_PROTOCOL)) {
           port = DEFAULT_SFTP_PORT;
         }
-        String cleanHost = host.replace(":" + port, "");
-        return urlInfo.toUri().getScheme() + "://" + cleanHost + urlInfo.toUri().getPath();
+        return UriBuilder.fromUri(urlInfo.toUri()).port(port).userInfo(null).toString();
       }
       return path;
     }
@@ -353,7 +346,7 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
       return specialCharacters.find();
     }
 
-    Map<String, String> getFileSystemProperties(FailureCollector collector) {
+    Map<String, String> getFileSystemProperties(@Nullable FailureCollector collector) {
       HashMap<String, String> fileSystemPropertiesMap = new HashMap<>();
       if (!Strings.isNullOrEmpty(fileSystemProperties)) {
         fileSystemPropertiesMap.putAll(GSON.fromJson(fileSystemProperties, MAP_STRING_STRING_TYPE));
