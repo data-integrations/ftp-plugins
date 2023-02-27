@@ -239,7 +239,7 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
         if (port == -1 && protocol.equals(SFTP_PROTOCOL)) {
           port = DEFAULT_SFTP_PORT;
         }
-        return UriBuilder.fromUri(urlInfo.toUri()).port(port).userInfo(null).toString();
+        return UriBuilder.fromUri(urlInfo.toUri()).port(port).userInfo(null).build().toString();
       }
       return path;
     }
