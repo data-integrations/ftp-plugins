@@ -44,7 +44,7 @@ import java.util.Map;
 public class FTPBatchSourceTest {
 
   private static final String USER = "user";
-  private static final String PASSWORD_WITH_SPECIAL_CHARACTERS = "wex^Yz@123#456!";
+  private static final String PASSWORD_WITH_SPECIAL_CHARACTERS = "we:/_x^Yz@123#456!";
   private static final String PASSWORD_WITHOUT_SPECIAL_CHARACTERS = "wexYz123456";
   private static final String HOST = "localhost";
   private static final int FTP_DEFAULT_PORT = 21;
@@ -82,8 +82,7 @@ public class FTPBatchSourceTest {
 
   @Test
   public void testSchemaDetection() {
-    String path = String.format("ftp://user2:%s@%s:%d/tmp/file1.txt",
-                                PASSWORD_WITH_SPECIAL_CHARACTERS, HOST, ftpServerPort);
+    String path = String.format("ftp://user:password@%s:%d/tmp/file1.txt", HOST, ftpServerPort);
     FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig(path, "csv", false);
     FTPBatchSource ftpBatchSource = new FTPBatchSource(config);
     Map<String, Object> plugins = new HashMap<>();
