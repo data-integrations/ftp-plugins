@@ -16,7 +16,6 @@
 
 package io.cdap.plugin.batch;
 
-import com.google.common.collect.ImmutableMap;
 import io.cdap.cdap.api.common.Bytes;
 import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
@@ -36,6 +35,8 @@ import io.cdap.cdap.proto.id.NamespaceId;
 import io.cdap.cdap.test.ApplicationManager;
 import io.cdap.cdap.test.DataSetManager;
 import io.cdap.cdap.test.WorkflowManager;
+import io.cdap.plugin.batch.source.ftp.FTPBatchSource;
+import io.cdap.plugin.batch.source.ftp.FTPLocation;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -48,6 +49,7 @@ import org.mockftpserver.fake.filesystem.UnixFakeFileSystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -62,14 +64,12 @@ import java.util.concurrent.TimeUnit;
 /**
  * FTP Source Test.
  */
-public class ETLFTPTestRun extends ETLBatchTestBase {
+public class ETLFTPTest extends ETLBatchTestBase {
   private static final String TEST_STRING = "Hello World";
   private static final String TEST_STRING_2 = "Goodnight Moon";
   private static File folder;
   private static File file2;
-  private static int port;
   private static FakeFtpServer ftpServer;
-  private static final String PATH = "path";
   private static final String IGNORE_NON_EXISTING_FOLDERS = "ignoreNonExistingFolders";
   private static final String FILE_REGEX = "fileRegex";
 
@@ -77,7 +77,7 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
   public void setup() throws IOException {
     folder = TMP_FOLDER.newFolder();
   }
-  
+
   @After
   public void stop() {
     if (ftpServer != null) {
@@ -88,7 +88,7 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
   /**
    * Start a fake FTP Server with a couple fake text files and return the URI for the base folder.
    */
-  private String startFtpServer() throws Exception {
+  private FTPLocation startFtpServer() throws Exception {
     File file = new File(folder, "sample");
     file2 = new File(folder, "sample2");
     FileSystem fileSystem = new UnixFakeFileSystem();
@@ -100,32 +100,36 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
   /**
    * Start a fake FTP Server with the given filesystem and return the URI for the base folder
    */
-  private String startFtpServer(FileSystem fileSystem) throws Exception {
+  private FTPLocation startFtpServer(FileSystem fileSystem) throws Exception {
+    String user = "ftp";
+    String pwd = "abcd";
+    return startFtpServer(fileSystem, user, pwd);
+  }
+
+  /**
+   * Start a fake FTP Server with the given filesystem and return the URI for the base folder
+   */
+  private FTPLocation startFtpServer(FileSystem fileSystem, String user, String pwd) throws Exception {
     ftpServer = new FakeFtpServer();
     ftpServer.setServerControlPort(0);
     ftpServer.setFileSystem(fileSystem);
-
-    String user = "ftp";
-    String pwd = "abcd";
     ftpServer.addUserAccount(new UserAccount(user, pwd, folder.getAbsolutePath()));
     ftpServer.start();
 
     Tasks.waitFor(true, () -> ftpServer.isStarted(), 5, TimeUnit.SECONDS);
-    port = ftpServer.getServerControlPort();
-    return String.format("ftp://%s:%s@localhost:%d%s", user, pwd, port, folder.getAbsolutePath());
+    int port = ftpServer.getServerControlPort();
+    URI uri = new URI("ftp", null, "localhost", port, folder.getAbsolutePath(), null, null);
+    return new FTPLocation(FTPLocation.Type.FTP, uri, user, pwd);
   }
 
   @Test
   public void testText() throws Exception {
-    String path = startFtpServer();
-    ETLStage source = new ETLStage("source", new ETLPlugin(
-      "FTP",
-      BatchSource.PLUGIN_TYPE,
-      ImmutableMap.<String, String>builder()
-        .put(PATH, path)
-        .put(IGNORE_NON_EXISTING_FOLDERS, "false")
-        .put("referenceName", "ftp")
-        .build()));
+    FTPLocation location = startFtpServer();
+    Map<String, String> properties = getLocationProperties(location);
+    properties.put(IGNORE_NON_EXISTING_FOLDERS, "false");
+    properties.put("referenceName", "ftp");
+    properties.put("format", "text");
+    ETLStage source = new ETLStage("source", new ETLPlugin(FTPBatchSource.NAME, BatchSource.PLUGIN_TYPE, properties));
     List<StructuredRecord> output = runPipeline(source);
 
     Assert.assertEquals("Expected records", 2, output.size());
@@ -141,16 +145,11 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
   public void testBlob() throws Exception {
     FileSystem fileSystem = new UnixFakeFileSystem();
     fileSystem.add(new FileEntry(folder.getAbsolutePath() + "/test.txt", "a\nb\nc"));
-    String path = startFtpServer(fileSystem);
-
-    ETLStage source = new ETLStage("source", new ETLPlugin(
-      "FTP",
-      BatchSource.PLUGIN_TYPE,
-      ImmutableMap.<String, String>builder()
-        .put(PATH, path + "/test.txt")
-        .put("referenceName", "ftp")
-        .put("format", "blob")
-        .build()));
+    FTPLocation location = startFtpServer(fileSystem);
+    Map<String, String> properties = getLocationProperties(location);
+    properties.put("referenceName", "ftp");
+    properties.put("format", "blob");
+    ETLStage source = new ETLStage("source", new ETLPlugin(FTPBatchSource.NAME, BatchSource.PLUGIN_TYPE, properties));
     List<StructuredRecord> output = runPipeline(source);
     Assert.assertEquals(1, output.size());
     ByteBuffer bodyBytes = output.get(0).get("body");
@@ -161,20 +160,16 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
   public void testJson() throws Exception {
     FileSystem fileSystem = new UnixFakeFileSystem();
     fileSystem.add(new FileEntry(folder.getAbsolutePath() + "/test.json", "{ \"a\":\"x\" }"));
-    String path = startFtpServer(fileSystem);
+    FTPLocation location = startFtpServer(fileSystem);
 
     Schema schema = Schema.recordOf("r",
                                     Schema.Field.of("a", Schema.of(Schema.Type.STRING)),
                                     Schema.Field.of("b", Schema.nullableOf(Schema.of(Schema.Type.STRING))));
-    ETLStage source = new ETLStage("source", new ETLPlugin(
-      "FTP",
-      BatchSource.PLUGIN_TYPE,
-      ImmutableMap.<String, String>builder()
-        .put(PATH, path + "/test.json")
-        .put("referenceName", "ftp")
-        .put("format", "json")
-        .put("schema", schema.toString())
-        .build()));
+    Map<String, String> properties = getLocationProperties(location);
+    properties.put("referenceName", "ftp");
+    properties.put("format", "json");
+    properties.put("schema", schema.toString());
+    ETLStage source = new ETLStage("source", new ETLPlugin(FTPBatchSource.NAME, BatchSource.PLUGIN_TYPE, properties));
     List<StructuredRecord> output = runPipeline(source);
     List<StructuredRecord> expected = Collections.singletonList(
       StructuredRecord.builder(schema).set("a", "x").build());
@@ -218,35 +213,27 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
     fileContent.append("0").append(delimiter).append("Alice").append(delimiter).append("\n");
     fileContent.append("1").append(delimiter).append("Bob").append(delimiter).append("bob@example.com").append("\n");
     fileSystem.add(new FileEntry(folder.getAbsolutePath() + "/test.csv", fileContent.toString()));
-    String path = startFtpServer(fileSystem);
-
-    ETLStage source = new ETLStage("source", new ETLPlugin(
-      "FTP",
-      BatchSource.PLUGIN_TYPE,
-      ImmutableMap.<String, String>builder()
-        .put(PATH, path + "/test.csv")
-        .put("skipHeader", Boolean.valueOf(useHeader).toString())
-        .put("referenceName", "ftp")
-        .put("format", format)
-        .put("delimiter", delimiter)
-        .put("schema", schema.toString())
-        .build()));
+    FTPLocation location = startFtpServer(fileSystem);
+    Map<String, String> properties = getLocationProperties(location);
+    properties.put("referenceName", "ftp");
+    properties.put("format", format);
+    properties.put("delimiter", delimiter);
+    properties.put("skipHeader", Boolean.valueOf(useHeader).toString());
+    properties.put("schema", schema.toString());
+    ETLStage source = new ETLStage("source", new ETLPlugin(FTPBatchSource.NAME, BatchSource.PLUGIN_TYPE, properties));
     Set<StructuredRecord> output = new HashSet<>(runPipeline(source));
     Assert.assertEquals(expected, output);
   }
 
   @Test
   public void testFTPBatchSourceWithRegex() throws Exception {
-    String path = startFtpServer();
-    ETLStage source = new ETLStage("source", new ETLPlugin(
-      "FTP",
-      BatchSource.PLUGIN_TYPE,
-      ImmutableMap.<String, String>builder()
-        .put(PATH, path)
-        .put(IGNORE_NON_EXISTING_FOLDERS, "false")
-        .put(FILE_REGEX, file2.getAbsolutePath())
-        .put("referenceName", "ftp")
-        .build()));
+    FTPLocation location = startFtpServer();
+    Map<String, String> properties = getLocationProperties(location);
+    properties.put("referenceName", "ftp");
+    properties.put(IGNORE_NON_EXISTING_FOLDERS, "false");
+    properties.put(FILE_REGEX, file2.getAbsolutePath());
+    properties.put("format", "text");
+    ETLStage source = new ETLStage("source", new ETLPlugin(FTPBatchSource.NAME, BatchSource.PLUGIN_TYPE, properties));
     List<StructuredRecord> output = runPipeline(source);
 
     Assert.assertEquals("Expected records", 1, output.size());
@@ -255,17 +242,21 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
 
   @Test
   public void testFTPBatchSourceWithMacro() throws Exception {
-    ETLStage source = new ETLStage("source", new ETLPlugin(
-      "FTP",
-      BatchSource.PLUGIN_TYPE,
-      ImmutableMap.<String, String>builder()
-        .put(PATH, "${path}")
-        .put("referenceName", "${referenceName}")
-        .build()));
-    String path = startFtpServer();
-    Map<String, String> args = new HashMap<>();
-    args.put("path", path);
+    FTPLocation location = startFtpServer();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("referenceName", "${referenceName}");
+    properties.put("host", "${host}");
+    properties.put("port", "${port}");
+    properties.put("path", "${path}");
+    properties.put("user", "${user}");
+    properties.put("type", "${type}");
+    properties.put("password", "${password}");
+    properties.put("format", "${format}");
+    ETLStage source = new ETLStage("source", new ETLPlugin(FTPBatchSource.NAME, BatchSource.PLUGIN_TYPE, properties));
+
+    Map<String, String> args = getLocationProperties(location);
     args.put("referenceName", "ftp_with_macro");
+    args.put("format", "text");
     List<StructuredRecord> output = runPipeline(source, args);
 
     Assert.assertEquals("Expected records", 2, output.size());
@@ -276,38 +267,37 @@ public class ETLFTPTestRun extends ETLBatchTestBase {
     Assert.assertTrue(outputValue.contains("Hello World"));
   }
 
+  private Map<String, String> getLocationProperties(FTPLocation location) {
+    Map<String, String> properties = new HashMap<>();
+    URI uri = location.getURI();
+    properties.put("host", uri.getHost());
+    properties.put("type", uri.getScheme());
+    properties.put("path", uri.getPath());
+    properties.put("port", String.valueOf(uri.getPort()));
+    properties.put("user", location.getUser());
+    properties.put("password", location.getPassword());
+    return properties;
+  }
+
   @Test
-  public void testFTPBatchSourceWithInvalidPath() {
-    ETLStage source = new ETLStage("source", new ETLPlugin(
-      "FTP",
-      BatchSource.PLUGIN_TYPE,
-      ImmutableMap.<String, String>builder()
-        .put(PATH, String.format("ftp://localhost:%d%s",
-                                 port, folder.getAbsolutePath()))
-        .put(IGNORE_NON_EXISTING_FOLDERS, "false")
-        .put("referenceName", "ftp")
-        .build()));
+  public void testUsernameWithColon() throws Exception {
+    File file = new File(folder, "sample");
+    FileSystem fileSystem = new UnixFakeFileSystem();
+    fileSystem.add(new FileEntry(file.getAbsolutePath(), TEST_STRING));
+    FTPLocation location = startFtpServer(fileSystem, "username::::@&1", "abc:::@!/");
+    Map<String, String> properties = getLocationProperties(location);
+    properties.put(IGNORE_NON_EXISTING_FOLDERS, "false");
+    properties.put("referenceName", "ftp");
+    properties.put("format", "text");
+    ETLStage source = new ETLStage("source", new ETLPlugin(FTPBatchSource.NAME, BatchSource.PLUGIN_TYPE, properties));
+    List<StructuredRecord> output = runPipeline(source);
 
-    String outputDatasetName = "testing-ftp-source";
-    ETLStage sink = new ETLStage("sink", MockSink.getPlugin(outputDatasetName));
-
-    ETLBatchConfig etlConfig = ETLBatchConfig.builder()
-      .addStage(source)
-      .addStage(sink)
-      .addConnection(source.getName(), sink.getName())
-      .setEngine(Engine.SPARK)
-      .build();
-
-    AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(DATAPIPELINE_ARTIFACT, etlConfig);
-    ApplicationId appId = NamespaceId.DEFAULT.app("FTPBatchSourceWithInvalidPath");
-
-    // deploying would thrown an exception
-    try {
-      deployApplication(appId, appRequest);
-      Assert.fail();
-    } catch (Exception e) {
-      //
+    Assert.assertEquals("Expected records", 1, output.size());
+    Set<String> outputValue = new HashSet<>();
+    for (StructuredRecord record : output) {
+      outputValue.add(record.get("body"));
     }
+    Assert.assertTrue(outputValue.contains(TEST_STRING));
   }
 
   private List<StructuredRecord> runPipeline(ETLStage sourceConfig) throws Exception {

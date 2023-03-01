@@ -1,6 +1,5 @@
 # FTP Batch Source
 
-
 Description
 -----------
 Batch source for an FTP or SFTP source. Prefix of the path ('ftp://...' or 'sftp://...') determines the source server
@@ -16,8 +15,17 @@ Properties
 ----------
 **Reference Name:** Name used to uniquely identify this source for lineage, annotating metadata, etc.
 
-**Path:** Path to file(s) to be read. The path uses filename expansion (globbing) to read files.
-Path is expected to be of the form prefix://username:password@hostname:port/path
+**Server Type:** Whether to read from an FTP or SFTP server
+
+**Host:** Host to read from.
+
+**Port:** Optional port to read from. If no port is given, it will default to 21 for FTP and 22 for SFTP.
+
+**Path:** Path to the file or directory to read from. For example: /path/to/directory.
+
+**User:** User name to use for authentication.
+
+**Password:** Password to use for authentication.
 
 **Format:** Format of the data to read.
 The format must be one of 'blob', 'csv', 'delimited', 'json', 'text', 'tsv', or the
@@ -38,17 +46,25 @@ JSON - is not supported. You must manually provide the output schema.
 
 **Delimiter:** Delimiter to use when the format is 'delimited'. This will be ignored for other formats.
 
-**Use First Row as Header:** Whether to use the first line of each file as the column headers. Supported formats are 'text', 'csv', 'tsv', and 'delimited'.
+**Use First Row as Header:** Whether to use the first line of each file as the column headers. Supported formats are '
+text', 'csv', 'tsv', and 'delimited'.
 
 **Enable Quoted Values** Whether to treat content between quotes as a value. This value will only be used if the format
-is 'csv', 'tsv' or 'delimited'. For example, if this is set to true, a line that looks like `1, "a, b, c"` will output two fields.
-The first field will have `1` as its value and the second will have `a, b, c` as its value. The quote characters will be trimmed.
+is 'csv', 'tsv' or 'delimited'. For example, if this is set to true, a line that looks like `1, "a, b, c"` will output
+two fields.
+The first field will have `1` as its value and the second will have `a, b, c` as its value. The quote characters will be
+trimmed.
 The newline delimiter cannot be within quotes.
 
-It also assumes the quotes are well enclosed. The left quote will match the first following quote right before the delimiter. If there is an
+It also assumes the quotes are well enclosed. The left quote will match the first following quote right before the
+delimiter. If there is an
 unenclosed quote, an error will occur.
 
-**Regex Path Filter:** Regex to filter out files in the path. It accepts regular expression which is applied to the complete
+**Enable Multiline Support** Enable the support for a single field, enclosed in quotes, to span over multiple lines.
+This value will only be used if the format is 'csv', 'tsv' or 'delimited'. The default value is false.
+
+**Regex Path Filter:** Regex to filter out files in the path. It accepts regular expression which is applied to the
+complete
 path and returns the list of files that match the specified pattern.
 
 **Allow Empty Input:** Identify if path needs to be ignored or not, for case when directory or file does not
