@@ -17,10 +17,7 @@ package io.cdap.plugin.batch.source.ftp;
 
 
 import io.cdap.cdap.api.data.schema.Schema;
-import io.cdap.cdap.etl.api.FailureCollector;
-import io.cdap.cdap.etl.api.validation.ValidationException;
 import io.cdap.cdap.etl.mock.common.MockPipelineConfigurer;
-import io.cdap.cdap.etl.mock.validation.MockFailureCollector;
 import io.cdap.plugin.format.delimited.input.CSVInputFormatProvider;
 import io.cdap.plugin.format.delimited.input.DelimitedConfig;
 import org.junit.AfterClass;
@@ -38,30 +35,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Unit test for {@link FTPBatchSource.FTPBatchSourceConfig} class.
+ * Unit test for {@link FTPBatchSource} class.
  */
-
 public class FTPBatchSourceTest {
-
-  private static final String USER = "user";
-  private static final String PASSWORD_WITH_SPECIAL_CHARACTERS = "wex^Yz@123#456!";
-  private static final String PASSWORD_WITHOUT_SPECIAL_CHARACTERS = "wexYz123456";
+  private static final String USER_WITH_SPECIAL_CHARACTERS = "user/12^!@_!";
+  private static final String PASSWORD_WITH_SPECIAL_CHARACTERS = "we:/%x^Yz@123#456!";
   private static final String HOST = "localhost";
-  private static final int FTP_DEFAULT_PORT = 21;
-  private static final int SFTP_DEFAULT_PORT = 22;
-  private static final String PATH = "/user-look-here.txt";
-  private static final String FTP_PREFIX = "ftp";
-  private static final String SFTP_PREFIX = "sftp";
-  private static final String SFTP_FS_CLASS = "org.apache.hadoop.fs.sftp.SFTPFileSystem";
-  private static final String FS_SFTP_IMPL = "fs.sftp.impl";
   private static FakeFtpServer ftpServer;
   private static int ftpServerPort;
 
   @BeforeClass
   public static void ftpSetup() {
     ftpServer = new FakeFtpServer();
-    ftpServer.addUserAccount(new UserAccount("user", "password", "/tmp"));
-    ftpServer.addUserAccount(new UserAccount("user2", PASSWORD_WITH_SPECIAL_CHARACTERS, "/tmp"));
+    ftpServer.addUserAccount(new UserAccount(USER_WITH_SPECIAL_CHARACTERS, PASSWORD_WITH_SPECIAL_CHARACTERS, "/tmp"));
     ftpServer.setServerControlPort(0);
 
     FileSystem fileSystem = new UnixFakeFileSystem();
@@ -82,9 +68,15 @@ public class FTPBatchSourceTest {
 
   @Test
   public void testSchemaDetection() {
-    String path = String.format("ftp://user2:%s@%s:%d/tmp/file1.txt",
-                                PASSWORD_WITH_SPECIAL_CHARACTERS, HOST, ftpServerPort);
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig(path, "csv", false);
+    FTPConfig config = FTPConfig.builder()
+      .setType(FTPLocation.Type.FTP)
+      .setHost(HOST)
+      .setPort(ftpServerPort)
+      .setPath("/tmp/file1.txt")
+      .setUser(USER_WITH_SPECIAL_CHARACTERS)
+      .setPassword(PASSWORD_WITH_SPECIAL_CHARACTERS)
+      .setFormat("csv")
+      .build();
     FTPBatchSource ftpBatchSource = new FTPBatchSource(config);
     Map<String, Object> plugins = new HashMap<>();
     plugins.put("csv", new CSVInputFormatProvider(new DelimitedConfig()));
@@ -95,155 +87,6 @@ public class FTPBatchSourceTest {
                                             Schema.Field.of("body_0", Schema.of(Schema.Type.STRING)),
                                             Schema.Field.of("body_1", Schema.of(Schema.Type.STRING)));
     Assert.assertEquals(expectedSchema, outputSchema);
-  }
-
-  @Test
-  public void testFTPPathWithSpecialCharactersInAuth() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("%s://%s:%s@%s:%d%s", FTP_PREFIX, USER,
-                                       PASSWORD_WITH_SPECIAL_CHARACTERS, HOST, FTP_DEFAULT_PORT, PATH), null);
-    config.validate(collector);
-
-    final HashMap<String, String> fileSystemProperties = new HashMap<>();
-    fileSystemProperties.put("fs.ftp.host", HOST);
-    fileSystemProperties.put(String.format("fs.ftp.user.%s", HOST), USER);
-    fileSystemProperties.put(String.format("fs.ftp.password.%s", HOST), PASSWORD_WITH_SPECIAL_CHARACTERS);
-    fileSystemProperties.put("fs.ftp.host.port", String.valueOf(FTP_DEFAULT_PORT));
-    Assert.assertEquals(fileSystemProperties, config.getFileSystemProperties(collector));
-  }
-
-  @Test
-  public void testFTPPathWithoutSpecialCharactersInAuth() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("%s://%s:%s@%s:%d%s", FTP_PREFIX, USER, PASSWORD_WITHOUT_SPECIAL_CHARACTERS,
-                                       HOST, FTP_DEFAULT_PORT, PATH), null);
-    config.validate(collector);
-    Assert.assertEquals(config.getPathFromConfig(), config.getPath());
-    Assert.assertEquals(0, config.getFileSystemProperties(collector).size());
-  }
-
-  @Test
-  public void testMissingAuthInPath() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("%s://%s:%d%s", FTP_PREFIX, HOST, FTP_DEFAULT_PORT, PATH), null);
-    try {
-      config.validate(collector);
-      Assert.fail();
-    } catch (ValidationException e) {
-      Assert.assertEquals(1, e.getFailures().size());
-      Assert.assertEquals(String.format("Missing authentication in url: %s.", config.getPathFromConfig()),
-                          e.getFailures().get(0).getMessage());
-    }
-  }
-
-  @Test
-  public void testSFTPPathWithSpecialCharactersInAuth() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    final HashMap<String, String> fileSystemProperties = new HashMap<>();
-    config.configuration(String.format("%s://%s:%s@%s:%d%s", SFTP_PREFIX, USER, PASSWORD_WITH_SPECIAL_CHARACTERS,
-                                       HOST, SFTP_DEFAULT_PORT, PATH), null);
-    config.validate(collector);
-
-    fileSystemProperties.put("fs.sftp.host", HOST);
-    fileSystemProperties.put(String.format("fs.sftp.user.%s", HOST), USER);
-    fileSystemProperties.put(String.format("fs.sftp.password.%s.%s", HOST, USER), PASSWORD_WITH_SPECIAL_CHARACTERS);
-    fileSystemProperties.put("fs.sftp.host.port", String.valueOf(SFTP_DEFAULT_PORT));
-    Assert.assertEquals(fileSystemProperties, config.getFileSystemProperties(collector));
-    Assert.assertEquals(String.format("%s://%s:%d%s", SFTP_PREFIX, HOST, SFTP_DEFAULT_PORT, PATH), config.getPath());
-  }
-
-  @Test
-  public void testSFTPPathWithoutSpecialCharactersInAuth() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("%s://%s:%s@%s:%d%s", SFTP_PREFIX, USER, PASSWORD_WITHOUT_SPECIAL_CHARACTERS,
-                                       HOST, SFTP_DEFAULT_PORT, PATH), null);
-    config.validate(collector);
-    Assert.assertEquals(config.getPathFromConfig(), config.getPath());
-    Assert.assertEquals(0, config.getFileSystemProperties(collector).size());
-  }
-
-  @Test
-  public void testFTPWithFileSystemProperties() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("%s://%s:%s@%s:%d%s", FTP_PREFIX, USER, PASSWORD_WITHOUT_SPECIAL_CHARACTERS,
-                                       HOST, FTP_DEFAULT_PORT, PATH),
-                         "{\"fs.sftp.impl\": \"org.apache.hadoop.fs.sftp.SFTPFileSystem\"}");
-    config.validate(collector);
-    Assert.assertEquals(config.getPathFromConfig(), config.getPath());
-    Assert.assertEquals(1, config.getFileSystemProperties(collector).size());
-    Assert.assertEquals(SFTP_FS_CLASS,
-                        config.getFileSystemProperties(collector).get(FS_SFTP_IMPL));
-  }
-
-  @Test
-  public void testFTPPathWithSystemPropertiesAndSpecialCharactersInAuth() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    final HashMap<String, String> fileSystemProperties = new HashMap<>();
-    config.configuration(String.format("%s://%s:%s@%s:%d%s", FTP_PREFIX, USER, PASSWORD_WITH_SPECIAL_CHARACTERS,
-                                       HOST, FTP_DEFAULT_PORT, PATH),
-                         "{\"fs.sftp.impl\": \"org.apache.hadoop.fs.sftp.SFTPFileSystem\"}");
-    config.validate(collector);
-
-    fileSystemProperties.put("fs.ftp.host", HOST);
-    fileSystemProperties.put(String.format("fs.ftp.user.%s", HOST), USER);
-    fileSystemProperties.put(String.format("fs.ftp.password.%s", HOST), PASSWORD_WITH_SPECIAL_CHARACTERS);
-    fileSystemProperties.put("fs.ftp.host.port", String.valueOf(FTP_DEFAULT_PORT));
-    fileSystemProperties.put(FS_SFTP_IMPL, SFTP_FS_CLASS);
-    Assert.assertEquals(5, config.getFileSystemProperties(collector).size());
-    Assert.assertEquals(fileSystemProperties, config.getFileSystemProperties(collector));
-  }
-
-  @Test
-  public void testSFTPPathWithSystemPropertiesAndSpecialCharactersInAuth() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    final HashMap<String, String> fileSystemProperties = new HashMap<>();
-    config.configuration(String.format("%s://%s:%s@%s:%d%s", SFTP_PREFIX, USER, PASSWORD_WITH_SPECIAL_CHARACTERS,
-                                       HOST, SFTP_DEFAULT_PORT, PATH),
-                         "{\"fs.sftp.impl\": \"org.apache.hadoop.fs.sftp.SFTPFileSystem\"}");
-    config.validate(collector);
-
-    fileSystemProperties.put("fs.sftp.host", HOST);
-    fileSystemProperties.put(String.format("fs.sftp.user.%s", HOST), USER);
-    fileSystemProperties.put(String.format("fs.sftp.password.%s.%s", HOST, USER), PASSWORD_WITH_SPECIAL_CHARACTERS);
-    fileSystemProperties.put("fs.sftp.host.port", String.valueOf(SFTP_DEFAULT_PORT));
-    fileSystemProperties.put(FS_SFTP_IMPL, SFTP_FS_CLASS);
-    Assert.assertEquals(5, config.getFileSystemProperties(collector).size());
-    Assert.assertEquals(fileSystemProperties, config.getFileSystemProperties(collector));
-  }
-
-  @Test
-  public void testInvalidServerFTPPathConnection() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("ftp://user:password@invalid_server:%d", ftpServerPort), "");
-    config.validate(collector);
-    Assert.assertEquals(1, collector.getValidationFailures().size());
-  }
-
-  @Test
-  public void testInvalidUsernamePasswordFTPPathConnection() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("ftp://wronguser:wrongpassword@localhost:%d", ftpServerPort), "");
-    config.validate(collector);
-    Assert.assertEquals(1, collector.getValidationFailures().size());
-  }
-
-  @Test
-  public void testValidFTPPathConnection() {
-    FailureCollector collector = new MockFailureCollector();
-    FTPBatchSource.FTPBatchSourceConfig config = new FTPBatchSource.FTPBatchSourceConfig();
-    config.configuration(String.format("ftp://user:password@localhost:%d", ftpServerPort), "");
-    config.validate(collector);
-    Assert.assertEquals(0, collector.getValidationFailures().size());
   }
 }
 

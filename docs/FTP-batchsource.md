@@ -16,8 +16,17 @@ Properties
 ----------
 **Reference Name:** Name used to uniquely identify this source for lineage, annotating metadata, etc.
 
-**Path:** Path to file(s) to be read. The path uses filename expansion (globbing) to read files.
-Path is expected to be of the form prefix://username:password@hostname:port/path
+**Server Type:** Whether to read from an FTP or SFTP server
+
+**Host:** Host to read from.
+
+**Port:** Optional port to read from. If no port is given, it will default to 21 for FTP and 22 for SFTP.
+
+**Path:** Path to the file or directory to read from. For example: /path/to/directory.
+
+**User:** User name to use for authentication.
+
+**Password:** Password to use for authentication.
 
 **Format:** Format of the data to read.
 The format must be one of 'blob', 'csv', 'delimited', 'json', 'text', 'tsv', or the

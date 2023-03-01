@@ -395,7 +395,6 @@
           <includes>
             <include>**/*TestSuite.java</include>
             <include>**/*Test.java</include>
-            <exclude>**/*TestRun.java</exclude>
           </includes>
           <excludes>
             <exclude>**/*TestBase.java</exclude>

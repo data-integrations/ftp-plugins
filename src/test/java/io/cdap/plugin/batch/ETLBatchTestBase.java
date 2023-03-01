@@ -97,27 +97,4 @@ public class ETLBatchTestBase extends HydratorTestBase {
     addPluginArtifact(NamespaceId.DEFAULT.artifact("formats-text", "4.0.0"), DATAPIPELINE_ARTIFACT_ID,
                       ImmutableSet.of(TextInputFormatProvider.PLUGIN_CLASS), TextInputFormatProvider.class);
   }
-
-  protected ApplicationManager deployETL(ETLBatchConfig etlConfig, String appName) throws Exception {
-    AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(DATAPIPELINE_ARTIFACT, etlConfig);
-    ApplicationId appId = NamespaceId.DEFAULT.app(appName);
-    return deployApplication(appId, appRequest);
-  }
-
-  /**
-   * Run the SmartWorkflow in the given ETL application for once and wait for the workflow's COMPLETED status
-   * with 5 minutes timeout.
-   *
-   * @param appManager the ETL application to run
-   * @param arguments  the arguments to be passed when running SmartWorkflow
-   */
-  protected WorkflowManager runETLOnce(ApplicationManager appManager, Map<String, String> arguments)
-    throws TimeoutException, InterruptedException, ExecutionException {
-    final WorkflowManager workflowManager = appManager.getWorkflowManager(SmartWorkflow.NAME);
-    int numRuns = workflowManager.getHistory().size();
-    workflowManager.start(arguments);
-    Tasks.waitFor(numRuns + 1, () -> workflowManager.getHistory().size(), 20, TimeUnit.SECONDS);
-    workflowManager.waitForStopped(5, TimeUnit.MINUTES);
-    return workflowManager;
-  }
 }
