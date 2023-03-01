@@ -307,12 +307,19 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
     }
 
     /**
-     * This method extracts the password from url
+     * This method extracts the password from url.
+     * This does some manual URI parsing and will not work properly if the username contains a colon,
+     * and will not work properly in all sorts of edge cases with malformed URIs.
+     * However, the underlying Hadoop FTP library also does not work properly on usernames with colon (see PLUGIN-1525).
      */
     public String extractPasswordFromUrl() {
+      if (!path.startsWith("ftp://") && !path.startsWith("sftp://")) {
+        throw new IllegalArgumentException("Invalid path. Please ensure that it starts with ftp:// or sftp://");
+      }
       int getLastIndexOfAtSign = path.lastIndexOf("@");
       String authentication = path.substring(0, getLastIndexOfAtSign);
-      return authentication.substring(authentication.lastIndexOf(":") + 1);
+      int usernameEndIndex = authentication.indexOf(':', authentication.indexOf(':') + 1);
+      return authentication.substring(usernameEndIndex + 1);
     }
 
     /**
