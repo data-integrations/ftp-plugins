@@ -181,6 +181,11 @@ public class FTPBatchSource extends AbstractFileSource<FTPBatchSource.FTPBatchSo
       "is 'csv', 'tsv' or 'delimited'. The default value is false.")
     protected Boolean enableQuotedValues;
 
+    @Macro
+    @Nullable
+    @Description("Enable the support for a single field, enclosed in quotes, to span over multiple lines. This " +
+      "value will only be used if the format is 'csv', 'tsv' or 'delimited'. The default value is false.")
+    protected Boolean enableMultilineSupport;
 
     @VisibleForTesting
     FTPBatchSourceConfig() {

@@ -83,6 +83,22 @@
         },
         {
           "widget-type": "toggle",
+          "name": "enableMultilineSupport",
+          "label": "Enable Multiline Support",
+          "widget-attributes": {
+            "default": "false",
+            "on": {
+              "value": "true",
+              "label": "True"
+            },
+            "off": {
+              "value": "false",
+              "label": "False"
+            }
+          }
+        },
+        {
+          "widget-type": "toggle",
           "name": "skipHeader",
           "label": "Use First Row as Header",
           "widget-attributes": {
@@ -176,6 +192,17 @@
       "show": [
         {
           "name": "enableQuotedValues"
+        }
+      ]
+    },
+    {
+      "name": "enableMultilineSupport",
+      "condition": {
+        "expression": "enableQuotedValues == true"
+      },
+      "show": [
+        {
+          "name": "enableMultilineSupport"
         }
       ]
     },
