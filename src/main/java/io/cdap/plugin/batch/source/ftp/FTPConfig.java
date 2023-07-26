@@ -145,13 +145,18 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
     "value will only be used if the format is 'csv', 'tsv' or 'delimited'. The default value is false.")
   protected Boolean enableMultilineSupport;
 
+  @Macro
+  @Nullable
+  @Description("Maximum time in milliseconds to wait for connection initialization before time out.")
+  private final Integer connectTimeout;
+
   @VisibleForTesting
   private FTPConfig(@Nullable String referenceName, String type, String host, @Nullable Integer port, String path,
                     String user, String password, @Nullable String fileSystemProperties,
                     @Nullable Boolean ignoreNonExistingFolders, @Nullable String fileRegex,
                     @Nullable Boolean skipHeader, @Nullable String format, @Nullable String schema,
                     @Nullable String delimiter, @Nullable Boolean enableQuotedValues,
-                    @Nullable Boolean enableMultilineSupport) {
+                    @Nullable Boolean enableMultilineSupport, @Nullable Integer connectTimeout) {
     this.referenceName = referenceName;
     this.type = type;
     this.host = host;
@@ -168,6 +173,14 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
     this.delimiter = delimiter;
     this.enableQuotedValues = enableQuotedValues;
     this.enableMultilineSupport = enableMultilineSupport;
+    this.connectTimeout = connectTimeout;
+  }
+
+  public int getConnectTimeout() {
+    if (connectTimeout == null) {
+      return FTPFileSystem.DEFAULT_CONNECTION_TIMEOUT_MS;
+    }
+    return connectTimeout;
   }
 
   @Override
@@ -186,10 +199,9 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
       for (Map.Entry<String, String> entry : location.getHadoopProperties().entrySet()) {
         conf.set(entry.getKey(), entry.getValue());
       }
+      conf.setInt(FTPFileSystem.FS_CONNECT_TIMEOUT, getConnectTimeout());
       try (FileSystem fs = JobUtils.applyWithExtraClassLoader(job, getClass().getClassLoader(),
                                                               f -> FileSystem.get(location.getURI(), conf))) {
-        // TODO: Add setTimeout option in the future
-        // https://cdap.atlassian.net/browse/PLUGIN-1181
         fs.getFileStatus(new Path(location.getURI()));
       }
     } catch (Exception e) {
@@ -371,6 +383,7 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
     private boolean skipHeader;
     private boolean enableQuotedValues;
     private boolean enableMultilineSupport;
+    private Integer connectTimeout;
 
     Builder() {
       this.fileSystemProperties = new HashMap<>();
@@ -379,6 +392,7 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
       this.enableMultilineSupport = false;
       this.skipHeader = false;
       this.format = "text";
+      this.connectTimeout = FTPFileSystem.DEFAULT_CONNECTION_TIMEOUT_MS;
     }
 
     Builder setType(FTPLocation.Type type) {
@@ -462,11 +476,16 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
       return this;
     }
 
+    Builder setConnectTimeout(Integer connectTimeout) {
+      this.connectTimeout = connectTimeout;
+      return this;
+    }
+
     FTPConfig build() {
       return new FTPConfig(referenceName, type.name(), host, port, path, user, password,
                            GSON.toJson(fileSystemProperties), ignoreNonExistingFolders, fileRegex, skipHeader,
                            format, schema == null ? null : schema.toString(), delimiter, enableQuotedValues,
-                           enableMultilineSupport);
+                           enableMultilineSupport, connectTimeout);
     }
   }
 }

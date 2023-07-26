@@ -53,6 +53,10 @@ public class FTPFileSystem extends FileSystem {
 
   public static final int DEFAULT_BLOCK_SIZE = 4 * 1024;
 
+  public static final Integer DEFAULT_CONNECTION_TIMEOUT_MS = 30000;
+
+  public static final String FS_CONNECT_TIMEOUT = "fs.connect.timeout";
+
   private URI uri;
 
   /**
@@ -111,7 +115,9 @@ public class FTPFileSystem extends FileSystem {
     int port = conf.getInt("fs.ftp.host.port", FTP.DEFAULT_PORT);
     String user = conf.get("fs.ftp.user." + host);
     String password = conf.get("fs.ftp.password." + host);
+    int connectTimeout = conf.getInt(FS_CONNECT_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT_MS);
     client = new FTPClient();
+    client.setConnectTimeout(connectTimeout);
     client.connect(host, port);
     int reply = client.getReplyCode();
     if (!FTPReply.isPositiveCompletion(reply)) {

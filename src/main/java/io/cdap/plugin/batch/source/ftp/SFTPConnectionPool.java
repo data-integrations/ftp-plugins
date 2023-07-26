@@ -24,6 +24,7 @@ import com.jcraft.jsch.Session;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -118,7 +119,7 @@ class SFTPConnectionPool {
   }
 
   public ChannelSftp connect(String host, int port, String user,
-                             String password, String keyFile) throws IOException {
+                             String password, String keyFile, int timeout) throws IOException {
     // get connection from pool
     ConnectionInfo info = new ConnectionInfo(host, port, user);
     ChannelSftp channel = getFromPool(info);
@@ -161,6 +162,7 @@ class SFTPConnectionPool {
 
       java.util.Properties config = new java.util.Properties();
       config.put("StrictHostKeyChecking", "no");
+      config.put("ConnectTimeout", String.valueOf(timeout));
       session.setConfig(config);
 
       session.connect();

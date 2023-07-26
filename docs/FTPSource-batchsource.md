@@ -23,7 +23,7 @@ Properties
 
 **Path:** Path to the file or directory to read from. For example: /path/to/directory.
 
-**User:** User name to use for authentication.
+**User:** Username to use for authentication.
 
 **Password:** Password to use for authentication.
 
@@ -68,6 +68,8 @@ complete
 path and returns the list of files that match the specified pattern.
 
 **Allow Empty Input:** Identify if path needs to be ignored or not, for case when directory or file does not
-exists. If set to true it will treat the not present folder as 0 input and log a warning. Default is false.
+exist. If set to true it will treat the not present folder as 0 input and log a warning. Default is false.
 
 **File System Properties:** Additional properties to use with the InputFormat when reading the data.
+
+**Connect Timeout:** Maximum time in milliseconds to wait for connection initialization before it times out.
