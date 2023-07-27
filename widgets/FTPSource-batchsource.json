@@ -185,6 +185,15 @@
               }
             ]
           }
+        },
+        {
+          "widget-type": "number",
+          "label": "Connect Timeout (milliseconds)",
+          "name": "connectTimeout",
+          "widget-attributes": {
+            "min": "0",
+            "default": "30000"
+          }
         }
       ]
     }

@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -83,11 +84,13 @@ public class SFTPFileSystem extends FileSystem {
     "Destination path %s already exist, cannot rename!";
   public static final String E_FAILED_GETHOME = "Failed to get home directory";
   public static final String E_FAILED_DISCONNECT = "Failed to disconnect";
+  public static final Integer DEFAULT_CONNECTION_TIMEOUT_MS = 30000;
+  public static final String FS_CONNECT_TIMEOUT = "fs.connect.timeout";
 
   /**
    * Set configuration from UI.
    *
-   * @param uri
+   * @param uriInfo
    * @param conf
    * @throws IOException
    */
@@ -145,9 +148,10 @@ public class SFTPFileSystem extends FileSystem {
     String user = conf.get(FS_SFTP_USER_PREFIX + host, null);
     String pwd = conf.get(FS_SFTP_PASSWORD_PREFIX + host + "." + user, null);
     String keyFile = conf.get(FS_SFTP_KEYFILE, null);
+    int connectTimeout = conf.getInt(FS_CONNECT_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT_MS);
 
     ChannelSftp channel =
-      connectionPool.connect(host, port, user, pwd, keyFile);
+      connectionPool.connect(host, port, user, pwd, keyFile, connectTimeout);
 
     return channel;
   }
@@ -155,7 +159,7 @@ public class SFTPFileSystem extends FileSystem {
   /**
    * Logout and disconnect the given channel.
    *
-   * @param client
+   * @param channel
    * @throws IOException
    */
   private void disconnect(ChannelSftp channel) throws IOException {
