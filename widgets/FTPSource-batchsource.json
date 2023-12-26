@@ -88,6 +88,10 @@
               {
                 "label": "tsv",
                 "value": "tsv"
+              },
+              {
+                "label": "parquet",
+                "value": "parquet"
               }
             ]
           }
