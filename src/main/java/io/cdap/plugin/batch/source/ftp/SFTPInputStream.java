@@ -19,6 +19,9 @@ package io.cdap.plugin.batch.source.ftp;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
+import io.cdap.cdap.api.exception.ErrorCategory;
+import io.cdap.cdap.api.exception.ErrorType;
+import io.cdap.cdap.api.exception.ErrorUtils;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapreduce.lib.input.LineRecordReader;
@@ -72,12 +75,18 @@ class SFTPInputStream extends FSInputStream {
     if (getPos() == position) {
       return;
     }
-    throw new IOException(E_SEEK_NOTSUPPORTED);
+    String errorMessage = "Operation not supported: Seek functionality is not available for this FTP server.";
+    throw ErrorUtils.getProgramFailureException(
+      new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+      errorMessage, ErrorType.USER, true, null);
   }
 
   @Override
-  public boolean seekToNewSource(long targetPos) throws IOException {
-    throw new IOException(E_SEEK_NOTSUPPORTED);
+  public boolean seekToNewSource(long targetPos) {
+    String errorMessage = "Seeking to a new source is not supported.";
+    throw ErrorUtils.getProgramFailureException(
+      new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+      errorMessage, ErrorType.USER, true, null);
   }
 
   @Override
@@ -88,7 +97,11 @@ class SFTPInputStream extends FSInputStream {
   @Override
   public synchronized int read() throws IOException {
     if (closed) {
-      throw new IOException(E_STREAM_CLOSED);
+      String errorMessage = "Stream closed. Ensure that the stream is not closed before attempting" +
+        " to read from it.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+        errorMessage, ErrorType.UNKNOWN, true, null);
     }
 
     int byteRead = wrappedStream.read();
@@ -105,7 +118,11 @@ class SFTPInputStream extends FSInputStream {
   public synchronized int read(byte[] buf, int off, int len)
     throws IOException {
     if (closed) {
-      throw new IOException(E_STREAM_CLOSED);
+      String errorMessage = "Stream closed. Ensure that the stream is not closed before attempting " +
+        "to read from it.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+        errorMessage, ErrorType.UNKNOWN, true, null);
     }
 
     int result = wrappedStream.read(buf, off, len);
@@ -127,7 +144,10 @@ class SFTPInputStream extends FSInputStream {
     super.close();
     closed = true;
     if (!channel.isConnected()) {
-      throw new IOException(E_CLIENT_NOTCONNECTED);
+      String errorMessage = "Client not connected. Ensure that the SFTP server is running.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+        errorMessage, ErrorType.UNKNOWN, true, null);
     }
 
     try {
@@ -135,7 +155,11 @@ class SFTPInputStream extends FSInputStream {
       channel.disconnect();
       session.disconnect();
     } catch (JSchException e) {
-      throw new IOException(StringUtils.stringifyException(e));
+      String errorReason = "Unable to close the SFTP connection.";
+      String errorMessage = StringUtils.stringifyException(e);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason,
+        errorMessage, ErrorType.UNKNOWN, true, null);
     }
   }
 }

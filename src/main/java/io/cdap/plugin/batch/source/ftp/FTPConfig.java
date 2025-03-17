@@ -340,7 +340,11 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
     try {
       new URI(host);
     } catch (Exception e) {
-
+      String errorReason = String.format("Unable to create a new URI for host %s with reason %s.",
+      host, e.getMessage());
+      collector.addFailure(String.format("%s %s: %s", errorReason, e.getClass().getName(), e.getMessage()), null)
+      .withStacktrace(e.getStackTrace());
+      collector.getOrThrowException();
     }
   }
 

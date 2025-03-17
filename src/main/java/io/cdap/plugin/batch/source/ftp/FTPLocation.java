@@ -16,6 +16,9 @@
 
 package io.cdap.plugin.batch.source.ftp;
 
+import io.cdap.cdap.api.exception.ErrorCategory;
+import io.cdap.cdap.api.exception.ErrorType;
+import io.cdap.cdap.api.exception.ErrorUtils;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
 import java.net.URI;
@@ -36,10 +39,10 @@ public class FTPLocation {
   public FTPLocation(Type type, URI uri, String user, String password) {
     if (!type.scheme.equals(uri.getScheme())) {
       // should never happen
-      throw new IllegalStateException(
-        String.format("Server type %s and URI scheme %s do not match. " +
-                        "This indicates a bug in the plugin, please contact support.",
-                      type.scheme, uri.getScheme()));
+      String errorMessage = String.format("Server type '%s' and URI scheme '%s' do not match. " +
+          "This indicates a bug in the plugin, please contact support.", type.scheme, uri.getScheme());
+      throw ErrorUtils.getProgramFailureException(new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+        errorMessage, errorMessage, ErrorType.UNKNOWN, true, null);
     }
     this.type = type;
     this.uri = uri;
@@ -80,7 +83,9 @@ public class FTPLocation {
         break;
       default:
         // should never happen
-        throw new IllegalStateException("Unknown FTP type " + type);
+        String errorMessage = String.format("Unknown FTP type: '%s'.", type);
+        throw ErrorUtils.getProgramFailureException(new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+          errorMessage, errorMessage, ErrorType.USER, false, null);
     }
     // Limit the number of splits to 1 since FTPInputStream does not support seek;
     properties.put(FileInputFormat.SPLIT_MINSIZE, Long.toString(Long.MAX_VALUE));
