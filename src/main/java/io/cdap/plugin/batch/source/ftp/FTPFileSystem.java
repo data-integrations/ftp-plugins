@@ -15,6 +15,9 @@
  */
 package io.cdap.plugin.batch.source.ftp;
 
+import io.cdap.cdap.api.exception.ErrorCategory;
+import io.cdap.cdap.api.exception.ErrorType;
+import io.cdap.cdap.api.exception.ErrorUtils;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
@@ -77,7 +80,10 @@ public class FTPFileSystem extends FileSystem {
     String host = uri.getHost();
     host = (host == null) ? conf.get("fs.ftp.host", null) : host;
     if (host == null) {
-      throw new IOException("Invalid host specified");
+      String errorMessage = "Invalid host name specified. Host name cannot be null.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.USER, false, null);
     }
     conf.set("fs.ftp.host", host);
 
@@ -89,7 +95,9 @@ public class FTPFileSystem extends FileSystem {
     String user = conf.get("fs.ftp.user." + host, null);
     String password = conf.get("fs.ftp.password." + host, null);
     if (user == null) {
-      throw new IOException("No user specified");
+      String errorMessage = "Invalid user name specified. User name cannot be null.";
+      throw ErrorUtils.getProgramFailureException(new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+        errorMessage, errorMessage, ErrorType.USER, false, null);
     }
 
     conf.set("fs.ftp.user." + host, user);
@@ -121,15 +129,22 @@ public class FTPFileSystem extends FileSystem {
     client.connect(host, port);
     int reply = client.getReplyCode();
     if (!FTPReply.isPositiveCompletion(reply)) {
-      throw new IOException("Server - " + host
-                              + " refused connection on port - " + port);
+      String errorMessage = String.format("Server - %s refused connection on port - %s. Please verify credentials" +
+                                            " and ensure FTP server is running.", host, port);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+        errorMessage, errorMessage, ErrorType.UNKNOWN, true, null);
     } else if (client.login(user, password)) {
       client.setFileTransferMode(FTP.BLOCK_TRANSFER_MODE);
       client.setFileType(FTP.BINARY_FILE_TYPE);
       client.setBufferSize(DEFAULT_BUFFER_SIZE);
     } else {
-      throw new IOException("Login failed on server - " + host + ", port - "
-                              + port);
+      String errorMessage = String.format("Login failed on server - %s, port - %s. Please verify" +
+                                            " credentials and ensure the FTP server is running.", host, port);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+        errorMessage, errorMessage, ErrorType.UNKNOWN, true, null
+      );
     }
 
     return client;
@@ -177,7 +192,10 @@ public class FTPFileSystem extends FileSystem {
     FileStatus fileStat = getFileStatus(client, absolute);
     if (fileStat.isDirectory()) {
       disconnect(client);
-      throw new IOException("Path " + file + " is a directory.");
+      String errorMessage = String.format("Failed to open path '%s': it is a directory.", file);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+        errorMessage, errorMessage, ErrorType.USER, false, null);
     }
     client.allocate(bufferSize);
     Path parent = absolute.getParent();
@@ -196,7 +214,10 @@ public class FTPFileSystem extends FileSystem {
       // The ftpClient is an inconsistent state. Must close the stream
       // which in turn will logout and disconnect from FTP server
       fis.close();
-      throw new IOException("Unable to open file: " + file + ", Aborting");
+      String errorMessage = String.format("Unable to open file: '%s'. Aborting operation.", file);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.UNKNOWN, true, null);
     }
     return fis;
   }
@@ -217,7 +238,10 @@ public class FTPFileSystem extends FileSystem {
         delete(client, file);
       } else {
         disconnect(client);
-        throw new IOException("File already exists: " + file);
+        String errorMessage = String.format("File already exists: '%s'.", file);
+        throw ErrorUtils.getProgramFailureException(
+          new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+          ErrorType.USER, false, null);
       }
     }
 
@@ -225,7 +249,10 @@ public class FTPFileSystem extends FileSystem {
     if (parent == null || !mkdirs(client, parent, FsPermission.getDirDefault())) {
       parent = (parent == null) ? new Path("/") : parent;
       disconnect(client);
-      throw new IOException("create(): Mkdirs failed to create: " + parent);
+      String errorMessage = String.format("create(): Mkdirs failed to create: '%s'.", parent);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.USER, false, null);
     }
     client.allocate(bufferSize);
     // Change to parent directory on the server. Only then can we write to the
@@ -254,7 +281,10 @@ public class FTPFileSystem extends FileSystem {
       // The ftpClient is an inconsistent state. Must close the stream
       // which in turn will logout and disconnect from FTP server
       fos.close();
-      throw new IOException("Unable to create file: " + file + ", Aborting");
+      String errorMessage = String.format("Unable to create file: '%s' , Aborting the operation.", file);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.UNKNOWN, true, null);
     }
     return fos;
   }
@@ -265,7 +295,10 @@ public class FTPFileSystem extends FileSystem {
   @Override
   public FSDataOutputStream append(Path f, int bufferSize,
                                    Progressable progress) throws IOException {
-    throw new IOException("Not supported");
+    String errorMessage = "The append operation is currently not supported.";
+    throw ErrorUtils.getProgramFailureException(
+      new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+      ErrorType.USER, true, null);
   }
 
   /**
@@ -318,7 +351,10 @@ public class FTPFileSystem extends FileSystem {
     }
     FileStatus[] dirEntries = listStatus(client, absolute);
     if (dirEntries != null && dirEntries.length > 0 && !(recursive)) {
-      throw new IOException("Directory: " + file + " is not empty.");
+      String errorMessage = String.format("Directory: '%s' is not empty.", file);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.USER, false, null);
     }
     if (dirEntries != null) {
       for (int i = 0; i < dirEntries.length; i++) {
@@ -493,8 +529,11 @@ public class FTPFileSystem extends FileSystem {
         created = created && client.makeDirectory(pathName);
       }
     } else if (isFile(client, absolute)) {
-      throw new IOException(String.format(
-        "Can't make directory for path %s since it is a file.", absolute));
+      String errorMessage = String.format("Can't make directory for path '%s' since it is a file.", absolute);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.USER, false, null);
+
     }
     return created;
   }
@@ -546,19 +585,28 @@ public class FTPFileSystem extends FileSystem {
     Path absoluteSrc = makeAbsolute(workDir, src);
     Path absoluteDst = makeAbsolute(workDir, dst);
     if (!exists(client, absoluteSrc)) {
-      throw new IOException("Source path " + src + " does not exist");
+      String errorMessage = String.format("Source path '%s' does not exist.", src);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.USER, false, null);
+
     }
     if (exists(client, absoluteDst)) {
-      throw new IOException("Destination path " + dst
-                              + " already exist, cannot rename!");
+      String errorMessage = String.format("Destination path '%s' already exist, cannot rename!", dst);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.USER, false, null);
     }
     String parentSrc = absoluteSrc.getParent().toUri().toString();
     String parentDst = absoluteDst.getParent().toUri().toString();
     String from = src.getName();
     String to = dst.getName();
     if (!parentSrc.equals(parentDst)) {
-      throw new IOException("Cannot rename parent(source): " + parentSrc
-                              + ", parent(destination):  " + parentDst);
+      String errorMessage = String.format("Cannot rename parent(source): '%s', parent(destination): '%s'.",
+                                          parentSrc, parentDst);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+        ErrorType.USER, false, null);
     }
     client.changeWorkingDirectory(parentSrc);
     boolean renamed = client.rename(from, to);

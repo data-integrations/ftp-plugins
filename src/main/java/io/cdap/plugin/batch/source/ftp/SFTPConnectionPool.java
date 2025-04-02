@@ -21,6 +21,9 @@ import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
+import io.cdap.cdap.api.exception.ErrorCategory;
+import io.cdap.cdap.api.exception.ErrorType;
+import io.cdap.cdap.api.exception.ErrorUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +64,11 @@ class SFTPConnectionPool {
         idleConnections.remove(info);
         return channel;
       } else {
-        throw new IOException("Connection pool error.");
+        String errorMessage = "Connection Pool Error: Unable to establish the SFTP connection. Please verify the SFTP" +
+          " credentials, and ensure the server is running.";
+        throw ErrorUtils.getProgramFailureException(
+          new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+          ErrorType.UNKNOWN, true, null);
       }
     }
     return null;
@@ -177,7 +184,11 @@ class SFTPConnectionPool {
       return channel;
 
     } catch (JSchException e) {
-      throw new IOException(StringUtils.stringifyException(e));
+      String errorReason = "Unable to establish the SFTP connection. Please verify the SFTP credentials and ensure " +
+        "server is running.";
+      String errorMessage = StringUtils.stringifyException(e);
+      throw ErrorUtils.getProgramFailureException(new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+      errorReason, errorMessage, ErrorType.UNKNOWN, true, null);
     }
   }
 
@@ -199,7 +210,10 @@ class SFTPConnectionPool {
             channel.disconnect();
             session.disconnect();
           } catch (JSchException e) {
-            throw new IOException(StringUtils.stringifyException(e));
+            String errorReason = "Unable to close the SFTP connection.";
+            String errorMessage = StringUtils.stringifyException(e);
+            throw ErrorUtils.getProgramFailureException(new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+            errorReason, errorMessage, ErrorType.UNKNOWN, true, null);
           }
         }
 

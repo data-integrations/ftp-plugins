@@ -15,6 +15,9 @@
  */
 package io.cdap.plugin.batch.source.ftp;
 
+import io.cdap.cdap.api.exception.ErrorCategory;
+import io.cdap.cdap.api.exception.ErrorType;
+import io.cdap.cdap.api.exception.ErrorUtils;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -67,18 +70,28 @@ public class FTPInputStream extends FSInputStream {
     if (getPos() == pos) {
       return;
     }
-    throw new IOException(SEEK_NOT_SUPPORTED);
+    String errorMessage = "Operation not supported: Seek functionality is not available for this FTP server.";
+    throw ErrorUtils.getProgramFailureException(
+      new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+      errorMessage, ErrorType.USER, true, null);
   }
 
   @Override
   public boolean seekToNewSource(long targetPos) throws IOException {
-    throw new IOException(SEEK_NOT_SUPPORTED);
+    String errorMessage = "Operation not supported: Seek functionality is not available for this FTP server.";
+    throw ErrorUtils.getProgramFailureException(
+      new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+      errorMessage, ErrorType.USER, true, null);
   }
 
   @Override
   public synchronized int read() throws IOException {
     if (closed) {
-      throw new IOException("Stream closed");
+      String errorMessage = "Stream closed. Ensure that the stream is not closed before attempting" +
+        " to read from it.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+        errorMessage, ErrorType.UNKNOWN, true, null);
     }
 
     int byteRead = wrappedStream.read();
@@ -94,7 +107,11 @@ public class FTPInputStream extends FSInputStream {
   @Override
   public synchronized int read(byte buf[], int off, int len) throws IOException {
     if (closed) {
-      throw new IOException("Stream closed");
+      String errorMessage = "Stream closed. Ensure that the stream is not closed before attempting" +
+        " to read from it.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+        errorMessage, ErrorType.UNKNOWN, true, null);
     }
 
     int result = wrappedStream.read(buf, off, len);
@@ -111,7 +128,11 @@ public class FTPInputStream extends FSInputStream {
   @Override
   public synchronized void close() throws IOException {
     if (closed) {
-      throw new IOException("Stream closed");
+      String errorMessage = "The stream is already closed. Please ensure the stream is open before attempting to " +
+        "close it again.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+        errorMessage, ErrorType.UNKNOWN, true, null);
     }
     super.close();
     closed = true;
@@ -142,6 +163,9 @@ public class FTPInputStream extends FSInputStream {
 
   @Override
   public void reset() throws IOException {
-    throw new IOException("Mark not supported");
+    String errorMessage = "Operation not supported: Mark functionality is not available for this FTP server.";
+    throw ErrorUtils.getProgramFailureException(
+      new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+      errorMessage, ErrorType.USER, true, null);
   }
 }

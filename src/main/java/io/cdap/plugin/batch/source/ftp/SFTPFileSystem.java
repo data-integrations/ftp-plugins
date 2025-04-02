@@ -21,6 +21,9 @@ import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.SftpATTRS;
 import com.jcraft.jsch.SftpException;
+import io.cdap.cdap.api.exception.ErrorCategory;
+import io.cdap.cdap.api.exception.ErrorType;
+import io.cdap.cdap.api.exception.ErrorUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -101,7 +104,10 @@ public class SFTPFileSystem extends FileSystem {
     String host = uriInfo.getHost();
     host = (host == null) ? conf.get(FS_SFTP_HOST, null) : host;
     if (host == null) {
-      throw new IOException(E_HOST_NULL);
+      String errorMessage = "Invalid host name specified. Host name cannot be null.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage,
+        errorMessage, ErrorType.USER, false, null);
     }
     conf.set(FS_SFTP_HOST, host);
 
@@ -186,14 +192,19 @@ public class SFTPFileSystem extends FileSystem {
    * the overhead of opening/closing a TCP connection.
    * @throws IOException
    */
-  private boolean exists(ChannelSftp channel, Path file) throws IOException {
+  private boolean exists(ChannelSftp channel, Path file) {
     try {
       getFileStatus(channel, file);
       return true;
     } catch (FileNotFoundException fnfe) {
       return false;
     } catch (IOException ioe) {
-      throw new IOException(E_FILE_STATUS, ioe);
+      String errorReason = String.format("Failed to retrieve the status of the file: '%s'.", file);
+      String errorMessage = String.format("Error while retrieving the status for file: '%s'. %s: %s.", file,
+                                          ioe.getClass().getName(), ioe.getMessage());
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, errorMessage, ErrorType.UNKNOWN,
+        true, null);
     }
   }
 
@@ -210,7 +221,13 @@ public class SFTPFileSystem extends FileSystem {
     try {
       workDir = new Path(client.pwd());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = String.format("Failed to retrieve working directory for the SFTP client while " +
+                                           "accessing file '%s'.", file);
+      String errorMessage = String.format("Failed to retrieve the working directory for the SFTP client while" +
+                                        " accessing file: '%s'. %s: %s.", file, e.getClass().getName(), e.getMessage());
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, errorMessage, ErrorType.UNKNOWN,
+        true, null);
     }
     Path absolute = makeAbsolute(workDir, file);
     Path parentPath = absolute.getParent();
@@ -258,7 +275,7 @@ public class SFTPFileSystem extends FileSystem {
    * @throws IOException
    */
   private FileStatus getFileStatus(ChannelSftp channel, LsEntry sftpFile,
-                                   Path parentPath) throws IOException {
+                                   Path parentPath) {
 
     SftpATTRS attr = sftpFile.getAttrs();
     long length = attr.getSize();
@@ -275,7 +292,13 @@ public class SFTPFileSystem extends FileSystem {
         isDir = fstat.isDirectory();
         length = fstat.getLen();
       } catch (Exception e) {
-        throw new IOException(e);
+        String errorReason = String.format("Failed to get file status '%s'. Verify that the file exists and the" +
+                                             " provided path: %s is correct.", sftpFile, parentPath);
+        String errorMessage = String.format("Failed to get file status for file: '%s'. %s: %s.",
+                                            sftpFile, e.getClass().getName(), e.getMessage());
+        throw ErrorUtils.getProgramFailureException(
+          new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, errorMessage, ErrorType.UNKNOWN,
+          true, null);
       }
     }
     int blockReplication = 1;
@@ -318,7 +341,11 @@ public class SFTPFileSystem extends FileSystem {
     try {
       workDir = new Path(client.pwd());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason =  "Failed to retrieve the current working directory on the SFTP server. Ensure the SFTP" +
+        " connection and user permissions are properly configured.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, e.getMessage(), ErrorType.UNKNOWN,
+        true, null);
     }
     Path absolute = makeAbsolute(workDir, file);
     String pathName = absolute.getName();
@@ -333,13 +360,19 @@ public class SFTPFileSystem extends FileSystem {
           client.cd(parentDir);
           client.mkdir(pathName);
         } catch (SftpException e) {
-          throw new IOException(String.format(E_MAKE_DIR_FORPATH, pathName,
-                                              parentDir));
+          String errorMessage = String.format(E_MAKE_DIR_FORPATH, pathName,
+                                              parentDir);
+          throw ErrorUtils.getProgramFailureException(
+            new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage, ErrorType.USER,
+            true, null);
         }
         created = created & succeeded;
       }
     } else if (isFile(client, absolute)) {
-      throw new IOException(String.format(E_DIR_CREATE_FROMFILE, absolute));
+      String errorMessage = String.format(E_DIR_CREATE_FROMFILE, absolute);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage, ErrorType.USER,
+        true, null);
     }
     return created;
   }
@@ -350,13 +383,19 @@ public class SFTPFileSystem extends FileSystem {
    * the overhead of opening/closing a TCP connection.
    * @throws IOException
    */
-  private boolean isFile(ChannelSftp channel, Path file) throws IOException {
+  private boolean isFile(ChannelSftp channel, Path file) {
     try {
       return !getFileStatus(channel, file).isDirectory();
     } catch (FileNotFoundException e) {
       return false; // file does not exist
     } catch (IOException ioe) {
-      throw new IOException(E_FILE_CHECK_FAILED, ioe);
+      String errorReason = String.format("Failed to check if the path '%s' is a directory. Encountered an error.",
+                                         file);
+      String errorMessage = String.format("Error occurred while checking if the path '%s' is a directory. %s: %s.",
+                                          file, ioe.getClass().getName(), ioe.getMessage());
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, errorMessage, ErrorType.UNKNOWN,
+        true, null);
     }
   }
 
@@ -371,7 +410,10 @@ public class SFTPFileSystem extends FileSystem {
     try {
       workDir = new Path(channel.pwd());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason =  "Failed to retrieve the current working directory on the SFTP server.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, e.getMessage(), ErrorType.UNKNOWN,
+        true, null);
     }
     Path absolute = makeAbsolute(workDir, file);
     String pathName = absolute.toUri().getPath();
@@ -395,7 +437,10 @@ public class SFTPFileSystem extends FileSystem {
       FileStatus[] dirEntries = listStatus(channel, absolute);
       if (dirEntries != null && dirEntries.length > 0) {
         if (!recursive) {
-          throw new IOException(String.format(E_DIR_NOTEMPTY, file));
+          String errorMessage = String.format(E_DIR_NOTEMPTY, file);
+          throw ErrorUtils.getProgramFailureException(
+            new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage, ErrorType.UNKNOWN,
+            true, null);
         }
         for (int i = 0; i < dirEntries.length; ++i) {
           delete(channel, new Path(absolute, dirEntries[i].getPath()),
@@ -423,7 +468,10 @@ public class SFTPFileSystem extends FileSystem {
     try {
       workDir = new Path(client.pwd());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = String.format("Failed to retrieve the current working directory for the SFTP client.");
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, e.getMessage(), ErrorType.UNKNOWN,
+        true, null);
     }
     Path absolute = makeAbsolute(workDir, file);
     FileStatus fileStat = getFileStatus(client, absolute);
@@ -434,7 +482,11 @@ public class SFTPFileSystem extends FileSystem {
     try {
       sftpFiles = (Vector<LsEntry>) client.ls(absolute.toUri().getPath());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = String.format("Failed to list contents of the directory at path '%s'.",
+                                         absolute.toUri().getPath());
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, e.getMessage(), ErrorType.UNKNOWN,
+        true, null);
     }
     ArrayList<FileStatus> fileStats = new ArrayList<FileStatus>();
     for (int i = 0; i < sftpFiles.size(); i++) {
@@ -459,22 +511,34 @@ public class SFTPFileSystem extends FileSystem {
    * @return rename successful?
    * @throws IOException
    */
-  private boolean rename(ChannelSftp channel, Path src, Path dst)
-    throws IOException {
+  private boolean rename(ChannelSftp channel, Path src, Path dst) {
     Path workDir;
     try {
       workDir = new Path(channel.pwd());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = String.format("Failed to retrieve the current working directory for the SFTP client.");
+      String errorMessage = String.format("Failed to retrieve the working directory for the SFTP client. " +
+                                            "Source Path: '%s', Destination Path: '%s'. %s: %s.",
+                                             src, dst, e.getClass().getName(), e.getMessage());
+
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, errorMessage, ErrorType.UNKNOWN,
+        true, null);
     }
     Path absoluteSrc = makeAbsolute(workDir, src);
     Path absoluteDst = makeAbsolute(workDir, dst);
 
     if (!exists(channel, absoluteSrc)) {
-      throw new IOException(String.format(E_SPATH_NOTEXIST, src));
+      String errorMessage = String.format(E_SPATH_NOTEXIST, src);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage, ErrorType.UNKNOWN,
+        true, null);
     }
     if (exists(channel, absoluteDst)) {
-      throw new IOException(String.format(E_DPATH_EXIST, dst));
+      String errorMessage = String.format(E_DPATH_EXIST, dst);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage, ErrorType.UNKNOWN,
+        true, null);
     }
     boolean renamed = true;
     try {
@@ -512,13 +576,19 @@ public class SFTPFileSystem extends FileSystem {
     try {
       workDir = new Path(channel.pwd());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = String.format("Failed to retrieve the current working directory for the SFTP client.");
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, e.getMessage(), ErrorType.UNKNOWN,
+        true, null);
     }
     Path absolute = makeAbsolute(workDir, f);
     FileStatus fileStat = getFileStatus(channel, absolute);
     if (fileStat.isDirectory()) {
       disconnect(channel);
-      throw new IOException(String.format(E_PATH_DIR, f));
+      String errorMessage = String.format(E_PATH_DIR, f);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage, ErrorType.USER,
+        false, null);
     }
     InputStream is;
     try {
@@ -527,7 +597,11 @@ public class SFTPFileSystem extends FileSystem {
 
       is = channel.get(absolute.toUri().getPath());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = String.format("Failed to retrieve input stream for file '%s'. Verify that the file" +
+                                           " exists and the path is correct.", absolute);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, e.getMessage(), ErrorType.UNKNOWN,
+        true, null);
     }
 
     FSDataInputStream fis =
@@ -548,7 +622,10 @@ public class SFTPFileSystem extends FileSystem {
     try {
       workDir = new Path(client.pwd());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = "Failed to retrieve the current working directory for the SFTP client.";
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, e.getMessage(), ErrorType.UNKNOWN,
+        true, null);
     }
     Path absolute = makeAbsolute(workDir, f);
     if (exists(client, f)) {
@@ -556,21 +633,34 @@ public class SFTPFileSystem extends FileSystem {
         delete(client, f, false);
       } else {
         disconnect(client);
-        throw new IOException(String.format(E_FILE_EXIST, f));
+        String errorMessage = String.format(E_FILE_EXIST, f);
+        throw ErrorUtils.getProgramFailureException(
+          new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+          errorMessage, errorMessage, ErrorType.USER, false, null);
       }
     }
     Path parent = absolute.getParent();
     if (parent == null || !mkdirs(client, parent, FsPermission.getDefault())) {
       parent = (parent == null) ? new Path("/") : parent;
       disconnect(client);
-      throw new IOException(String.format(E_CREATE_DIR, parent));
+      String errorMessage = String.format(E_CREATE_DIR, parent);
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN),
+        errorMessage, errorMessage, ErrorType.USER, false, null);
     }
     OutputStream os;
     try {
       client.cd(parent.toUri().getPath());
       os = client.put(f.getName());
     } catch (SftpException e) {
-      throw new IOException(e);
+      String errorReason = String.format("Failed to change directory to '%s' or create an output stream for the" +
+                                           " file '%s'.", parent.toUri().getPath(), f.getName());
+      String errorMessage = String.format("Failed to change directory to '%s' or create an output stream for" +
+                                            " the file '%s'. %s: %s.", parent.toUri().getPath(), f.getName(),
+                                            e.getClass().getName(), e.getMessage());
+      throw ErrorUtils.getProgramFailureException(
+        new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorReason, errorMessage, ErrorType.UNKNOWN,
+        true, null);
     }
     FSDataOutputStream fos = new FSDataOutputStream(os, statistics) {
       @Override
@@ -585,9 +675,11 @@ public class SFTPFileSystem extends FileSystem {
 
   @Override
   public FSDataOutputStream append(Path f, int bufferSize,
-                                   Progressable progress)
-    throws IOException {
-    throw new IOException(E_NOT_SUPPORTED);
+                                   Progressable progress) {
+    String errorMessage = E_NOT_SUPPORTED;
+    throw ErrorUtils.getProgramFailureException(
+      new ErrorCategory(ErrorCategory.ErrorCategoryEnum.PLUGIN), errorMessage, errorMessage,
+      ErrorType.USER, true, null);
   }
 
   /*
