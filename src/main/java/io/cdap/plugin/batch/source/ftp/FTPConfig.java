@@ -59,8 +59,6 @@ public class FTPConfig extends PluginConfig implements FileSourceProperties {
   }.getType();
   private static final List<String> LOCATION_PROPERTIES = Arrays.asList("type", "host", "path", "user", "password");
 
-  @Macro
-  @Nullable
   @Description("Name be used to uniquely identify this source for lineage, annotating metadata, etc.")
   private final String referenceName;
 
