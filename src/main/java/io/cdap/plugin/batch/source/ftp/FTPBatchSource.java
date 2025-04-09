@@ -73,7 +73,9 @@ public class FTPBatchSource extends AbstractFileSource<FTPConfig> {
       failureCollector.getOrThrowException();
     }
     Map<String, String> properties = new HashMap<>(config.getFileSystemProperties());
-    properties.putAll(location.getHadoopProperties());
+    if (location != null) {
+      properties.putAll(location.getHadoopProperties());
+    }
     return properties;
   }
 
