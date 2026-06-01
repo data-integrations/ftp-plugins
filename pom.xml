@@ -40,7 +40,7 @@
     <hydrator.version>2.13.0</hydrator.version>
     <hadoop.version>3.3.6</hadoop.version>
     <mockftp.version>2.6</mockftp.version>
-    <junit.version>4.11</junit.version>
+    <junit.version>4.13.1</junit.version>
     <mockito.version>2.24.0</mockito.version>
     <guava.version>13.0.1</guava.version>
     <jackson.version>2.13.0</jackson.version>
