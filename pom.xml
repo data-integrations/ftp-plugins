@@ -21,7 +21,7 @@
 
   <groupId>io.cdap.plugin</groupId>
   <artifactId>ftp-plugins</artifactId>
-  <version>3.2.1</version>
+  <version>3.2.2-SNAPSHOT</version>
 
   <licenses>
     <license>
@@ -59,11 +59,11 @@
       <artifactId>guava</artifactId>
       <version>${guava.version}</version>
     </dependency>
-    <!-- Spark provides hadoop-common but does not include jsch for sftp support -->
+    <!-- Spark provides hadoop-common but does not include jsch for sftp support. -->
     <dependency>
-      <groupId>com.jcraft</groupId>
+      <groupId>com.github.mwiede</groupId>
       <artifactId>jsch</artifactId>
-      <version>0.1.54</version>
+      <version>2.28.0</version>
     </dependency>
     <dependency>
       <groupId>io.cdap.cdap</groupId>
