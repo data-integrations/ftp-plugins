@@ -36,13 +36,13 @@
     <!-- properties for script build step that creates the config files for the artifacts -->
     <data.pipeline.parent>system:cdap-data-pipeline[6.11.0-SNAPSHOT,7.0.0-SNAPSHOT)</data.pipeline.parent>
     <data.stream.parent>system:cdap-data-streams[6.11.0-SNAPSHOT,7.0.0-SNAPSHOT)</data.stream.parent>
-    <cdap.version>6.11.0</cdap.version>
+    <cdap.version>6.12.0-SNAPSHOT</cdap.version>
     <hydrator.version>2.13.0</hydrator.version>
     <hadoop.version>3.3.6</hadoop.version>
     <mockftp.version>2.6</mockftp.version>
     <junit.version>4.11</junit.version>
     <mockito.version>2.24.0</mockito.version>
-    <guava.version>13.0.1</guava.version>
+    <guava.version>33.8.0-jre</guava.version>
     <jackson.version>2.13.0</jackson.version>
     <surefire.redirectTestOutputToFile>true</surefire.redirectTestOutputToFile>
   </properties>
@@ -60,11 +60,20 @@
     </repository>
   </repositories>
 
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>${guava.version}</version>
     </dependency>
     <!-- Spark provides hadoop-common but does not include jsch for sftp support -->
     <dependency>
